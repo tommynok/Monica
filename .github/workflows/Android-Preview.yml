@@ -335,17 +335,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          draft_ids=$(gh api repos/${{ github.repository }}/releases --paginate --jq '.[] | select(.tag_name == "preview" and .draft == true) | .id')
-          if [ -z "$draft_ids" ]; then
+          mapfile -t draft_ids < <(gh api repos/${{ github.repository }}/releases --paginate --jq '.[] | select(.tag_name == "preview" and .draft == true) | .id' | tr -d '\r')
+          if [ "${#draft_ids[@]}" -eq 0 ]; then
             echo "No duplicate preview draft releases to clean"
             exit 0
           fi
 
-          while IFS= read -r release_id; do
+          for release_id in "${draft_ids[@]}"; do
             [ -z "$release_id" ] && continue
             echo "Deleting duplicate preview draft release id=${release_id}"
-            gh api -X DELETE repos/${{ github.repository }}/releases/${release_id}
-          done <<< "$draft_ids"
+            gh api -X DELETE "repos/${{ github.repository }}/releases/${release_id}" || echo "::warning::Failed to delete draft release ${release_id}"
+          done
 
       - name: Cleanup previous preview release assets
         if: github.event_name != 'pull_request'
@@ -353,23 +353,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          release_id="$(gh api repos/${{ github.repository }}/releases/tags/preview --jq '.id' 2>/dev/null || true)"
+          release_id="$(gh api repos/${{ github.repository }}/releases/tags/preview --jq '.id' 2>/dev/null | tr -d '\r' || true)"
           if [ -z "$release_id" ]; then
             echo "No existing preview release assets to clean"
             exit 0
           fi
 
-          asset_ids="$(gh api repos/${{ github.repository }}/releases/${release_id}/assets --paginate --jq '.[].id')"
-          if [ -z "$asset_ids" ]; then
+          mapfile -t asset_ids < <(gh api "repos/${{ github.repository }}/releases/${release_id}/assets" --paginate --jq '.[].id' | tr -d '\r')
+          if [ "${#asset_ids[@]}" -eq 0 ]; then
             echo "Preview release has no existing assets"
             exit 0
           fi
 
-          while IFS= read -r asset_id; do
+          for asset_id in "${asset_ids[@]}"; do
             [ -z "$asset_id" ] && continue
             echo "Deleting previous preview asset id=${asset_id}"
-            gh api -X DELETE repos/${{ github.repository }}/releases/assets/${asset_id}
-          done <<< "$asset_ids"
+            gh api -X DELETE "repos/${{ github.repository }}/releases/assets/${asset_id}" || echo "::warning::Failed to delete asset ${asset_id}"
+          done
 
       - name: Publish Preview to Release
         if: github.event_name != 'pull_request'
