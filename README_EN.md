@@ -205,3 +205,8 @@ Monica is released under [GNU General Public License v3.0](LICENSE).
 - This project locally bundles icon assets from the [Stratum Auth app](https://github.com/stratumauth/app) (version [v1.4.0](https://github.com/stratumauth/app/releases/tag/v1.4.0), directories [icons](https://github.com/stratumauth/app/tree/v1.4.0/icons) / [extraicons](https://github.com/stratumauth/app/tree/v1.4.0/extraicons), GPL-3.0).
 - Bank card/payment icon source: local directory [SVG Credit Card & Payment Icons](svg-credit-card-payment-icons-main) (Apache-2.0).
 - Brand names and logos remain the property of their respective owners.
+
+## F-Droid contact
+
+For F-Droid metadata or packaging issues, contact: joyin8888@foxmail.com
+

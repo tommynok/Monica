@@ -205,3 +205,8 @@ Monica duoc phat hanh theo [GNU General Public License v3.0](LICENSE).
 - Du an nay dong goi cuc bo cac tai nguyen icon tu [Stratum Auth app](https://github.com/stratumauth/app) (phien ban [v1.4.0](https://github.com/stratumauth/app/releases/tag/v1.4.0), thu muc [icons](https://github.com/stratumauth/app/tree/v1.4.0/icons) / [extraicons](https://github.com/stratumauth/app/tree/v1.4.0/extraicons), GPL-3.0).
 - Nguon icon the ngan hang/thanh toan: thu muc cuc bo [SVG Credit Card & Payment Icons](svg-credit-card-payment-icons-main) (Apache-2.0).
 - Ten thuong hieu va logo thuoc quyen so huu cua cac chu so huu tuong ung.
+
+## F-Droid contact
+
+For F-Droid metadata or packaging issues, contact: joyin8888@foxmail.com
+
