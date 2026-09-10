@@ -86,26 +86,13 @@ fun PermissionCard(
 
             // 权限信息
             Column(modifier = Modifier.weight(1f)) {
-                Row(
+                Text(
+                    text = permissionName,
+                    style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = permissionName,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .padding(end = 8.dp),
-                        maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                    )
-                    // 重要性标签
-                    PermissionImportanceChip(
-                        importance = permission.importance,
-                        modifier = Modifier.wrapContentWidth()
-                    )
-                }
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -115,6 +102,14 @@ fun PermissionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // 重要性标签
+                PermissionImportanceChip(
+                    importance = permission.importance,
+                    modifier = Modifier.wrapContentWidth()
                 )
             }
 
