@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -403,7 +405,11 @@ fun AddButtonCustomizationScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                        ) {
                             listOf(
                                 AddButtonBehaviorMode.DIRECT_PASSWORD to stringResource(R.string.add_button_mode_direct),
                                 AddButtonBehaviorMode.EXPANDABLE_MENU to stringResource(R.string.add_button_mode_expand)
@@ -411,6 +417,7 @@ fun AddButtonCustomizationScreen(
                                 SegmentedButton(
                                     selected = settings.addButtonBehaviorMode == mode,
                                     onClick = { viewModel.updateAddButtonBehaviorMode(mode) },
+                                    modifier = Modifier.fillMaxHeight(),
                                     shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(
                                         index = index,
                                         count = 2
@@ -1602,7 +1609,11 @@ fun PasswordCardAdjustmentScreen(
                         text = stringResource(R.string.stack_mode_menu_title),
                         style = MaterialTheme.typography.titleMedium
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
+                    ) {
                         val selectedMode = runCatching {
                             StackCardMode.valueOf(settings.stackCardMode)
                         }.getOrDefault(StackCardMode.AUTO)
@@ -1615,6 +1626,7 @@ fun PasswordCardAdjustmentScreen(
                             SegmentedButton(
                                 selected = selectedMode == mode,
                                 onClick = { viewModel.updateStackCardMode(mode.name) },
+                                modifier = Modifier.fillMaxHeight(),
                                 shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(
                                     index = index,
                                     count = 2
@@ -1762,7 +1774,11 @@ fun PasswordCardAdjustmentScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
+                    ) {
                         listOf("strict", "relaxed").forEachIndexed { index, mode ->
                             val text = if (mode == "strict") {
                                 stringResource(R.string.website_stack_match_mode_strict)
@@ -1772,6 +1788,7 @@ fun PasswordCardAdjustmentScreen(
                             SegmentedButton(
                                 selected = websiteStackMatchMode == mode,
                                 onClick = { viewModel.updatePasswordWebsiteStackMatchMode(mode) },
+                                modifier = Modifier.fillMaxHeight(),
                                 shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(
                                     index = index,
                                     count = 2
@@ -2035,6 +2052,7 @@ fun AuthenticatorCardAdjustmentScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .height(IntrinsicSize.Min)
                     ) {
                         listOf(
                             AuthenticatorLayoutMode.STANDARD to stringResource(R.string.authenticator_layout_standard),
@@ -2043,6 +2061,7 @@ fun AuthenticatorCardAdjustmentScreen(
                             SegmentedButton(
                                 selected = settings.authenticatorLayoutMode == mode,
                                 onClick = { viewModel.updateAuthenticatorLayoutMode(mode) },
+                                modifier = Modifier.fillMaxHeight(),
                                 shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(
                                     index = index,
                                     count = 2
