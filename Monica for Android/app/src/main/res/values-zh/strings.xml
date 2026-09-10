@@ -1433,6 +1433,12 @@
     <string name="security_question_preset_8">您童年最好的朋友叫什么名字？</string>
     <string name="security_question_preset_9">您的第一份工作是什么？</string>
     <string name="security_question_preset_10">您最喜欢的电影是什么？</string>
+    <string name="security_question_born_city">您出生在哪个城市？</string>
+    <string name="security_question_first_car">您的第一辆汽车是什么型号？</string>
+    <string name="security_question_childhood_food">您小时候最喜欢的食物是什么？</string>
+    <string name="security_question_grew_up_street">您成长的街道名称是什么？</string>
+    <string name="security_question_hs_mascot">您高中的吉祥物是什么？</string>
+    <string name="security_question_ultraman">你喜欢什么奥特曼？</string>
     
     <!-- Support Author Screen (legacy) -->
     <string name="support_author_description">如果您觉得这个应用有帮助，请考虑支持作者。您的支持是我们持续改进的最大动力！</string>

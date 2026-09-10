@@ -1437,7 +1437,15 @@
     <string name="security_question_preset_8">What is the name of your best friend from childhood?</string>
     <string name="security_question_preset_9">What was your first job?</string>
     <string name="security_question_preset_10">What is your favorite movie?</string>
-    
+
+    <!-- Additional preset security questions used by SecurityQuestionsSetupScreen -->
+    <string name="security_question_born_city">In what city were you born?</string>
+    <string name="security_question_first_car">What was your first car model?</string>
+    <string name="security_question_childhood_food">What was your favorite food as a child?</string>
+    <string name="security_question_grew_up_street">What is the name of the street you grew up on?</string>
+    <string name="security_question_hs_mascot">What was your high school mascot?</string>
+    <string name="security_question_ultraman">Which Ultraman do you like the most?</string>
+
     <!-- Support Author Screen (legacy) -->
     <string name="support_author_description">Enjoying Monica? Your support helps keep it improving.</string>
     <string name="support_author_thanks">Thank You!</string>

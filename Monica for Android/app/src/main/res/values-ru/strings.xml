@@ -1035,6 +1035,12 @@
     <string name="security_question_preset_8">Имя вашего лучшего друга детства?</string>
     <string name="security_question_preset_9">Ваша первая работа?</string>
     <string name="security_question_preset_10">Ваш любимый фильм?</string>
+    <string name="security_question_born_city">В каком городе вы родились?</string>
+    <string name="security_question_first_car">Какой была модель вашего первого автомобиля?</string>
+    <string name="security_question_childhood_food">Какая еда была вашей любимой в детстве?</string>
+    <string name="security_question_grew_up_street">На какой улице вы выросли?</string>
+    <string name="security_question_hs_mascot">Каким был талисман вашей школы?</string>
+    <string name="security_question_ultraman">Какой Ультрамен вам нравится больше всего?</string>
 
     <!-- Support Author Screen -->
     <string name="support_author_description">Нравится Monica? Ваша поддержка помогает развивать приложение.</string>
