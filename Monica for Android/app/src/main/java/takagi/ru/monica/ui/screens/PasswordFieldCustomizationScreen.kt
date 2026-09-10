@@ -741,9 +741,9 @@ private fun PresetFieldDialog(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f, fill = false)) {
                             Text(
                                 text = stringResource(R.string.custom_field_sensitive),
                                 style = MaterialTheme.typography.bodyMedium
@@ -754,18 +754,19 @@ private fun PresetFieldDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        Spacer(modifier = Modifier.width(12.dp))
                         Switch(
                             checked = isSensitive,
                             onCheckedChange = { isSensitive = it }
                         )
                     }
-                    
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f, fill = false)) {
                             Text(
                                 text = stringResource(R.string.password_field_customization_required_field),
                                 style = MaterialTheme.typography.bodyMedium
@@ -776,6 +777,7 @@ private fun PresetFieldDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        Spacer(modifier = Modifier.width(12.dp))
                         Switch(
                             checked = isRequired,
                             onCheckedChange = { isRequired = it }
