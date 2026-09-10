@@ -13,14 +13,22 @@ internal fun rememberWalletStackEntries(
     stacks: List<WalletStack>,
     showIndividualCards: Boolean,
     selectionMode: Boolean = false
-): State<List<WalletStackListEntry>> = produceState<List<WalletStackListEntry>>(
-    initialValue = emptyList(),
+): State<WalletStackProjection> = produceState(
+    initialValue = WalletStackProjection(emptyList(), selectionMode),
     System.identityHashCode(cards), stacks, showIndividualCards, selectionMode
 ) {
     value = withContext(Dispatchers.Default) {
-        projectWalletStacks(cards, stacks, showIndividualCards, selectionMode)
+        WalletStackProjection(
+            projectWalletStacks(cards, stacks, showIndividualCards, selectionMode),
+            selectionMode
+        )
     }
 }
+
+internal data class WalletStackProjection(
+    val entries: List<WalletStackListEntry>,
+    val selectionMode: Boolean
+)
 
 internal sealed interface WalletStackListEntry {
     val key: String
@@ -42,7 +50,7 @@ internal sealed interface WalletStackListEntry {
         val stack: WalletStack?,
         val cards: List<WalletListItem>
     ) : WalletStackListEntry {
-        // Preserve the collapsed stack's scroll anchor when entering selection mode.
+        // Keep the stack's identity when its presentation changes to a section header.
         override val key: String = stack?.let { "stack:${it.id}" } ?: "selection:unstacked"
         val cover: WalletListItem? get() = cards.firstOrNull { it.id == stack?.coverId } ?: cards.firstOrNull()
     }

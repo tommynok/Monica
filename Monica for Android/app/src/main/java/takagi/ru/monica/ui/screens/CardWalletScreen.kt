@@ -99,6 +99,7 @@ import takagi.ru.monica.ui.cardwallet.WalletStackManageDialog
 import takagi.ru.monica.ui.cardwallet.WalletStackListEntry
 import takagi.ru.monica.ui.cardwallet.WalletSelectionCardFrame
 import takagi.ru.monica.ui.cardwallet.WalletSelectionSectionHeader
+import takagi.ru.monica.ui.cardwallet.rememberWalletSelectionScrollAnchor
 import takagi.ru.monica.ui.cardwallet.rememberWalletStackEntries
 import takagi.ru.monica.ui.cardwallet.reorderWalletSingleCards
 import takagi.ru.monica.ui.cardwallet.toggleWalletSelectionGroup
@@ -1114,10 +1115,14 @@ fun CardWalletScreen(
                         var walletIsDragging by remember { mutableStateOf(false) }
                         var walletDragBaseOrderIds by remember { mutableStateOf<List<Long>?>(null) }
                         var pendingWalletOrderIds by remember { mutableStateOf<List<Long>?>(null) }
-                        val displayItems by rememberWalletStackEntries(
+                        val stackProjection by rememberWalletStackEntries(
                             localFilteredItems, walletStacks.orEmpty(),
                             showIndividualCards = searchQuery.isNotBlank(),
                             selectionMode = isSelectionMode
+                        )
+                        val displayItems = stackProjection.entries
+                        val captureSelectionScrollAnchor = rememberWalletSelectionScrollAnchor(
+                            listState, stackProjection, isSelectionMode
                         )
                         // Lists are immutable snapshots. Use identity tokens as effect keys so
                         // scrolling does not repeatedly compare every wallet item by value.
@@ -1253,8 +1258,9 @@ fun CardWalletScreen(
                                 }
                                 if (displayItem is WalletStackListEntry.Stack) {
                                     val coverId = stackCoverOverrides[displayItem.stack.id] ?: displayItem.stack.coverId
+                                    val visibleStack = displayItem.copy(stack = displayItem.stack.copy(coverId = coverId))
                                     WalletStackCard(
-                                        entry = displayItem.copy(stack = displayItem.stack.copy(coverId = coverId)),
+                                        entry = visibleStack,
                                         onClick = {
                                             scope.launch {
                                                 listState.stopScroll()
@@ -1266,6 +1272,9 @@ fun CardWalletScreen(
                                             }
                                         },
                                         onLongClick = {
+                                            if (!isSelectionMode) {
+                                                captureSelectionScrollAnchor(displayItem.key, visibleStack.cover.id)
+                                            }
                                             selectedIds = displayItem.cards.map(WalletListItem::id).toSet()
                                             isSelectionMode = true
                                         },
@@ -1290,10 +1299,13 @@ fun CardWalletScreen(
                                     ) { isDragging ->
                                         val isSelected = selectedIds.contains(walletItem.id)
                                         val toggleSelection = {
-                                            val nextSelectedIds = if (isSelected) {
-                                                selectedIds - item.id
-                                            } else {
-                                                selectedIds + item.id
+                                            if (!isSelectionMode) {
+                                                captureSelectionScrollAnchor(displayItem.key, item.id)
+                                            }
+                                            val nextSelectedIds = when {
+                                                !isSelectionMode -> setOf(item.id)
+                                                isSelected -> selectedIds - item.id
+                                                else -> selectedIds + item.id
                                             }
                                             selectedIds = nextSelectedIds
                                             isSelectionMode = true
@@ -1338,14 +1350,7 @@ fun CardWalletScreen(
                                                     onToggleFavorite = { id, _ -> bankCardViewModel.toggleFavorite(id) },
                                                     isSelectionMode = isSelectionMode,
                                                     isSelected = isSelected,
-                                                    onLongClick = {
-                                                        if (!isSelectionMode) {
-                                                            isSelectionMode = true
-                                                            selectedIds = setOf(item.id)
-                                                        } else {
-                                                            toggleSelection()
-                                                        }
-                                                    },
+                                                    onLongClick = toggleSelection,
                                                     modifier = cardModifier,
                                                     cardData = walletItem.bankCardData
                                                 )
@@ -1363,14 +1368,7 @@ fun CardWalletScreen(
                                                     onToggleFavorite = { id, _ -> documentViewModel.toggleFavorite(id) },
                                                     isSelectionMode = isSelectionMode,
                                                     isSelected = isSelected,
-                                                    onLongClick = {
-                                                        if (!isSelectionMode) {
-                                                            isSelectionMode = true
-                                                            selectedIds = setOf(item.id)
-                                                        } else {
-                                                            toggleSelection()
-                                                        }
-                                                    },
+                                                    onLongClick = toggleSelection,
                                                     modifier = cardModifier,
                                                     documentData = walletItem.documentData
                                                 )
@@ -1388,14 +1386,7 @@ fun CardWalletScreen(
                                                     onToggleFavorite = { id, _ -> billingAddressViewModel.toggleFavorite(id) },
                                                     isSelectionMode = isSelectionMode,
                                                     isSelected = isSelected,
-                                                    onLongClick = {
-                                                        if (!isSelectionMode) {
-                                                            isSelectionMode = true
-                                                            selectedIds = setOf(item.id)
-                                                        } else {
-                                                            toggleSelection()
-                                                        }
-                                                    },
+                                                    onLongClick = toggleSelection,
                                                     modifier = cardModifier,
                                                     addressData = walletItem.billingAddressData
                                                 )
