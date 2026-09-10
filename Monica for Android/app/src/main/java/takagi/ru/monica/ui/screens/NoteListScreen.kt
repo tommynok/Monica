@@ -1,18 +1,14 @@
 package takagi.ru.monica.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -60,12 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
@@ -166,9 +157,12 @@ fun NoteListScreen(
         searchQuery = ""
     }
 
-    BackHandler(enabled = isSearchExpanded) {
-        collapseSearch()
+    val exitSelection = {
+        isSelectionMode = false
+        selectedNoteIds = emptySet()
     }
+
+    BackHandler(enabled = isSelectionMode, onBack = exitSelection)
 
     LaunchedEffect(isSelectionMode) {
         onSelectionModeChange(isSelectionMode)
@@ -759,10 +753,7 @@ fun NoteListScreen(
                     NoteSelectionActionBar(
                         modifier = Modifier.wrapContentWidth(),
                         selectedCount = selectedNoteIds.size,
-                        onExit = {
-                            isSelectionMode = false
-                            selectedNoteIds = emptySet()
-                        },
+                        onExit = exitSelection,
                         onSelectAll = {
                             selectedNoteIds = if (selectedNoteIds.size == filteredNotes.size) {
                                 emptySet()

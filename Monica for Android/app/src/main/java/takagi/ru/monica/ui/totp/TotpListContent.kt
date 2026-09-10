@@ -3,6 +3,7 @@ package takagi.ru.monica.ui
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.rememberUpdatedState
@@ -10,7 +11,6 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
@@ -35,21 +35,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.unit.Velocity
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.animation.core.Animatable
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -96,15 +87,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.fragment.app.FragmentActivity
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import takagi.ru.monica.R
 import takagi.ru.monica.bitwarden.sync.isUserVisibleSyncInProgress
@@ -277,17 +265,17 @@ fun TotpListContent(
             flow
         }
     }
-    val parsedTotpItems by viewModel.parsedTotpItems.collectAsState()
+    val parsedTotpState by viewModel.parsedTotpState.collectAsState()
+    val parsedTotpItems = parsedTotpState.items
     val totpItems = remember(parsedTotpItems) { parsedTotpItems.map { it.item } }
     val totpDataById = remember(parsedTotpItems) { parsedTotpItems.associate { it.item.id to it.totpData } }
     val searchQuery by viewModel.searchQuery.collectAsState()
     // The list only needs titles for bound-password delete messaging. Use the
     // metadata-only stream so entering the authenticator does not decrypt every
     // password just to build this lookup map.
-    val passwords by passwordViewModel.allPasswordsForUi.collectAsState(initial = emptyList())
+    val passwords by viewModel.passwordTitles.collectAsState(initial = emptyList())
     val passwordMap = remember(passwords) { passwords.associateBy { it.id } }
     val haptic = rememberHapticFeedback()
-    val focusManager = LocalFocusManager.current
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var showTopActionsMenu by remember { mutableStateOf(false) }
 
@@ -347,12 +335,6 @@ fun TotpListContent(
         }
     }
 
-    // 如果搜索框展开，按返回键关闭搜索框
-    BackHandler(enabled = isSearchExpanded) {
-        isSearchExpanded = false
-        viewModel.updateSearchQuery("")
-        focusManager.clearFocus()
-    }
 
     // Pull-to-search state
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -535,6 +517,8 @@ fun TotpListContent(
         isSelectionMode = false
         selectedItems = setOf()
     }
+
+    BackHandler(enabled = isSelectionMode, onBack = exitSelection)
     
     val selectAll = {
         selectedItems = if (selectedItems.size == filteredTotpItems.size) {
@@ -1004,13 +988,15 @@ fun TotpListContent(
         val contentPullOffset = if (enableBitwardenPullSync) 0 else pullAction.currentOffset.toInt()
 
         // TOTP列表
-        if (filteredTotpItems.isEmpty()) {
-            // 空状态
+        if (!parsedTotpState.isReady) {
+            takagi.ru.monica.ui.components.LoadingIndicator()
+        } else if (filteredTotpItems.isEmpty()) {
+            // Empty is shown only after the first parsed database snapshot.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .offset { androidx.compose.ui.unit.IntOffset(0, contentPullOffset) }
-                    .nestedScroll(pullAction.nestedScrollConnection)
+                    .then(pullAction.gestureModifier)
                     .pointerInput(isSearchExpanded) {
                         detectVerticalDragGestures(
                             onVerticalDrag = { _, dragAmount ->
@@ -1086,7 +1072,7 @@ fun TotpListContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .offset { androidx.compose.ui.unit.IntOffset(0, contentPullOffset) }
-                        .nestedScroll(pullAction.nestedScrollConnection)
+                        .then(pullAction.gestureModifier)
                 ) {
                     items(
                         items = localTotpItems,
@@ -1181,7 +1167,7 @@ fun TotpListContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .offset { androidx.compose.ui.unit.IntOffset(0, contentPullOffset) }
-                    .nestedScroll(pullAction.nestedScrollConnection),
+                    .then(pullAction.gestureModifier),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {

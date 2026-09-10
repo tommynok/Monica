@@ -14,7 +14,7 @@ class TotpPasswordMetadataStreamGuardTest {
 
         assertTrue(
             "Authenticator list should not collect the decrypting allPasswords stream for title-only lookup.",
-            source.contains("passwordViewModel.allPasswordsForUi.collectAsState")
+            source.contains("viewModel.passwordTitles.collectAsState")
         )
     }
 
@@ -30,8 +30,8 @@ class TotpPasswordMetadataStreamGuardTest {
                 source.contains(".shareIn(")
         )
         assertTrue(
-            "Filtered TOTP items should consume the shared allTotpItems state rather than the cold source.",
-            source.contains("allTotpItems,")
+            "Filtered TOTP items should consume the shared source without an initial empty sentinel.",
+            source.contains("allTotpItemsSource,")
         )
     }
 

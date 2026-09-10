@@ -164,13 +164,16 @@ class DocumentViewModel(
             initialValue = emptyList()
         )
 
+    private val listDataCache = ItemDataSnapshotCache<DocumentData>()
+
     private val parsedDocumentsStateSource: Flow<LoadedListState<ParsedDocumentItem>> = allDocumentsSource
         .map { items ->
+            val parsed = listDataCache.parse(items) { parseDocumentData(it) }
             LoadedListState(
-                items = items.map { item ->
+                items = items.mapIndexed { index, item ->
                     ParsedDocumentItem(
                         item = item,
-                        documentData = parseDocumentData(item.itemData) ?: emptyDocumentData()
+                        documentData = parsed[index] ?: emptyDocumentData()
                     )
                 },
                 isReady = true,

@@ -33,7 +33,7 @@ import takagi.ru.monica.R
 import takagi.ru.monica.data.SecureItem
 import takagi.ru.monica.data.model.CardFaceConfig
 import takagi.ru.monica.data.model.CardFaceDisplayMode
-import takagi.ru.monica.ui.components.MonicaItemCardShape
+import takagi.ru.monica.ui.components.BankCardShape
 
 /** Owns only the unsaved image. Existing images are loaded through the shared attachment cache. */
 @Stable
@@ -87,7 +87,7 @@ fun CardFaceDetailHeader(
             onClick = onClick,
             enabled = enabled,
             modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth().aspectRatio(CardFaceImageProcessor.CARD_ASPECT_RATIO),
-            shape = MonicaItemCardShape
+            shape = BankCardShape
         ) {
             CardFaceArtwork(
                 previewData = previewData,

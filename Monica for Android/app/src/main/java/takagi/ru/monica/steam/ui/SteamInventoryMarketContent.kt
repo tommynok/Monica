@@ -71,7 +71,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -216,7 +215,7 @@ internal fun SteamInventoryContent(
                     state = gridState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .nestedScroll(pullToSearch.nestedScrollConnection),
+                        .then(pullToSearch.gestureModifier),
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         top = 4.dp,
@@ -380,7 +379,7 @@ internal fun SteamMarketListingsContent(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .nestedScroll(pullToSearch.nestedScrollConnection),
+                        .then(pullToSearch.gestureModifier),
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         top = 12.dp,

@@ -65,7 +65,7 @@ import takagi.ru.monica.data.model.BankCardData
 import takagi.ru.monica.data.model.CardFaceAttachment
 import takagi.ru.monica.data.model.CardFaceConfig
 import takagi.ru.monica.data.model.CardFaceDisplayMode
-import takagi.ru.monica.ui.components.MonicaItemCardShape
+import takagi.ru.monica.ui.components.BankCardShape
 
 data class CardFaceEditResult(
     val config: CardFaceConfig?,
@@ -117,6 +117,8 @@ fun CardFaceCustomizer(
     var config by remember { mutableStateOf(initialConfig) }
     var preview by remember { mutableStateOf(initialBitmap) }
     var preparedBytes by remember { mutableStateOf(initialImageBytes?.copyOf()) }
+    var cropSource by remember { mutableStateOf<Bitmap?>(null) }
+    // Compose may retain a bitmap in a submitted frame; let GC release crop sources.
     var isProcessing by remember { mutableStateOf(false) }
     var imageError by remember { mutableStateOf<Int?>(null) }
     val currentBytes by rememberUpdatedState(preparedBytes)
@@ -137,7 +139,7 @@ fun CardFaceCustomizer(
         imageError = null
         scope.launch {
             try {
-                val result = CardFaceImageProcessor.prepare(context, uri)
+                val result = CardFaceImageProcessor.decode(context, uri)
                 val prepared = result.getOrNull()
                 if (prepared == null) {
                     imageError = when ((result.exceptionOrNull() as? CardFaceImageProcessor.ImportException)?.reason) {
@@ -147,11 +149,7 @@ fun CardFaceCustomizer(
                         else -> R.string.card_face_image_invalid
                     }
                 } else {
-                    preparedBytes?.fill(0)
-                    preparedBytes = prepared.bytes
-                    preview = prepared.preview
-                    val fileName = CardFaceAttachment.newFileName()
-                    config = config?.copy(imageAttachmentName = fileName) ?: CardFaceConfig(fileName)
+                    cropSource = prepared
                 }
             } finally {
                 isProcessing = false
@@ -160,11 +158,37 @@ fun CardFaceCustomizer(
     }
 
     Dialog(
-        onDismissRequest = { if (!isProcessing && !isSaving) onDismiss() },
+        onDismissRequest = {
+            if (!isProcessing && !isSaving) {
+                val source = cropSource
+                if (source != null) { cropSource = null } else onDismiss()
+            }
+        },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Scaffold(
+            val source = cropSource
+            if (source != null) {
+                CardFaceCropper(source, isProcessing, imageError,
+                    onCancel = { cropSource = null },
+                    onConfirm = { region ->
+                        imageError = null
+                        isProcessing = true
+                        scope.launch {
+                            try {
+                                val result = CardFaceImageProcessor.crop(source, region)
+                                result.onSuccess { prepared ->
+                                    preparedBytes?.fill(0)
+                                    preparedBytes = prepared.bytes
+                                    preview = prepared.preview
+                                    val fileName = CardFaceAttachment.newFileName()
+                                    config = config?.copy(imageAttachmentName = fileName) ?: CardFaceConfig(fileName)
+                                    cropSource = null
+                                }.onFailure { imageError = R.string.card_face_image_invalid }
+                            } finally { isProcessing = false }
+                        }
+                    })
+            } else Scaffold(
                 topBar = {
                     TopAppBar(
                         title = { Text(stringResource(R.string.card_face_customize)) },
@@ -202,7 +226,7 @@ fun CardFaceCustomizer(
                         } else {
                             Card(
                                 modifier = Modifier.fillMaxWidth().aspectRatio(CardFaceImageProcessor.CARD_ASPECT_RATIO),
-                                shape = MonicaItemCardShape,
+                                shape = BankCardShape,
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
                             ) {
                                 Column(

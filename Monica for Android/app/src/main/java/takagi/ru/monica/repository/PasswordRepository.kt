@@ -53,6 +53,12 @@ class PasswordRepository(
         return passwordEntryDao.getActiveEntries().withoutExternalSteamMaFileEntries()
     }
 
+    fun getActiveAuthenticatorEntries(): Flow<List<PasswordEntry>> =
+        passwordEntryDao.getActiveAuthenticatorEntries().withoutExternalSteamMaFileEntries()
+
+    fun getActivePasswordTitles(): Flow<List<takagi.ru.monica.data.PasswordTitle>> =
+        passwordEntryDao.getActivePasswordTitles()
+
     suspend fun getAllLocalPasswordEntries(): List<PasswordEntry> {
         return passwordEntryDao.getAllLocalEntries().withoutExternalSteamMaFileEntries()
     }

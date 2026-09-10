@@ -1,5 +1,6 @@
 package takagi.ru.monica.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
@@ -31,9 +34,13 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -45,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import takagi.ru.monica.R
+import androidx.lifecycle.compose.currentStateAsState
 
 internal fun initialSearchTextFieldValue(searchQuery: String): TextFieldValue =
     TextFieldValue(
@@ -65,6 +73,7 @@ internal fun reconcileSearchTextFieldValue(
  * M3E 风格的顶部标题栏
  * 支持大标题和集成的搜索展开动画
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ExpressiveTopBar(
     title: String,
@@ -82,6 +91,39 @@ fun ExpressiveTopBar(
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val imeVisible = WindowInsets.isImeVisible
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
+    var imeWasVisible by remember(isSearchExpanded) { mutableStateOf(false) }
+    var keepSearchAfterImeAction by remember(isSearchExpanded) { mutableStateOf(false) }
+    var closeRequested by remember(isSearchExpanded) { mutableStateOf(false) }
+
+    fun closeSearch() {
+        if (!isSearchExpanded || closeRequested) return
+        closeRequested = true
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        onSearchQueryChange("")
+        onSearchExpandedChange(false)
+    }
+
+    // IMEs consume Android Back before activity callbacks. Finish the same dismissal when
+    // their window closes; keep explicit keyboard Done/Search actions useful for viewing results.
+    BackHandler(enabled = isSearchExpanded && windowFocused) { closeSearch() }
+    LaunchedEffect(isSearchExpanded, imeVisible, windowFocused, lifecycleState) {
+        if (!isSearchExpanded || !windowFocused ||
+            !lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+        ) {
+            imeWasVisible = false
+        } else if (imeVisible) {
+            imeWasVisible = true
+        } else if (imeWasVisible) {
+            imeWasVisible = false
+            if (!keepSearchAfterImeAction) closeSearch()
+            keepSearchAfterImeAction = false
+        }
+    }
     val searchInteractionSource = remember { MutableInteractionSource() }
     var searchFieldValueState by remember {
         mutableStateOf(initialSearchTextFieldValue(searchQuery))
@@ -95,9 +137,10 @@ fun ExpressiveTopBar(
         }
     }
 
-    LaunchedEffect(searchInteractionSource) {
+    LaunchedEffect(searchInteractionSource, isSearchExpanded) {
         searchInteractionSource.interactions.collect { interaction ->
             if (interaction is PressInteraction.Press) {
+                keepSearchAfterImeAction = false
                 focusRequester.requestFocus()
                 keyboardController?.show()
             }
@@ -179,9 +222,7 @@ fun ExpressiveTopBar(
                                 totalDrag = 0f
                             } else if (isSearchExpanded && totalDrag > threshold) {
                                 change.consume()
-                                onSearchExpandedChange(false)
-                                onSearchQueryChange("")
-                                focusManager.clearFocus()
+                                closeSearch()
                                 totalDrag = 0f
                             }
                         }
@@ -241,6 +282,17 @@ fun ExpressiveTopBar(
                                         color = MaterialTheme.colorScheme.onSurface
                                     ),
                                     singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
+                                            keepSearchAfterImeAction = true
+                                            keyboardController?.hide()
+                                        },
+                                        onSearch = {
+                                            keepSearchAfterImeAction = true
+                                            keyboardController?.hide()
+                                        },
+                                    ),
                                     interactionSource = searchInteractionSource,
                                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                                     modifier = Modifier.focusRequester(focusRequester)
@@ -259,11 +311,7 @@ fun ExpressiveTopBar(
                                     }
                                 }
 
-                                IconButton(onClick = { 
-                                    onSearchExpandedChange(false)
-                                    onSearchQueryChange("")
-                                    focusManager.clearFocus()
-                                }) {
+                                IconButton(onClick = { closeSearch() }) {
                                     Icon(
                                         imageVector = Icons.Default.ArrowForward, // 使用向右的箭头，表示收回方向
                                         contentDescription = stringResource(R.string.topbar_close_search),

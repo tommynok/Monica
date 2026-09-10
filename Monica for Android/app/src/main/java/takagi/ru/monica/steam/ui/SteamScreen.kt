@@ -113,7 +113,6 @@ import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -2434,7 +2433,7 @@ private fun SteamCodeContent(
                         state = lazyListState,
                         modifier = Modifier
                             .fillMaxSize()
-                            .nestedScroll(pullToSearch.nestedScrollConnection),
+                            .then(pullToSearch.gestureModifier),
                         contentPadding = PaddingValues(
                             start = 16.dp,
                             top = 16.dp,
@@ -3541,7 +3540,7 @@ private fun SteamConfirmationsContent(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .nestedScroll(pullToSearch.nestedScrollConnection),
+                        .then(pullToSearch.gestureModifier),
                     contentPadding = PaddingValues(
                         start = 16.dp,
                         top = 10.dp,

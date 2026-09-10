@@ -315,13 +315,16 @@ class BankCardViewModel(
             initialValue = emptyList()
         )
 
+    private val listDataCache = ItemDataSnapshotCache<BankCardData>()
+
     private val parsedCardsStateSource: Flow<LoadedListState<ParsedBankCardItem>> = allCardsSource
         .map { items ->
+            val parsed = listDataCache.parse(items) { parseCardData(it) }
             LoadedListState(
-                items = items.map { item ->
+                items = items.mapIndexed { index, item ->
                     ParsedBankCardItem(
                         item = item,
-                        cardData = parseCardData(item.itemData) ?: emptyBankCardData()
+                        cardData = parsed[index] ?: emptyBankCardData()
                     )
                 },
                 isReady = true,

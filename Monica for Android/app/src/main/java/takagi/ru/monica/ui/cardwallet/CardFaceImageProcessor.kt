@@ -33,14 +33,20 @@ object CardFaceImageProcessor {
 
     data class Prepared(val bytes: ByteArray, val preview: Bitmap)
 
-    suspend fun prepare(context: Context, uri: Uri): Result<Prepared> = withContext(Dispatchers.IO) {
+    suspend fun prepare(context: Context, uri: Uri): Result<Prepared> {
+        val decoded = decode(context, uri).getOrElse { return Result.failure(it) }
+        return try { crop(decoded, CardCropGeometry.centered(decoded.width, decoded.height)) }
+        finally { decoded.recycle() }
+    }
+
+    suspend fun decode(context: Context, uri: Uri): Result<Bitmap> = withContext(Dispatchers.IO) {
         try {
             val resolver = context.applicationContext.contentResolver
             val sourceBytes = openSourceStream(resolver, uri)?.use {
                 readBoundedBytes(it, MAX_SOURCE_BYTES) ?: throw ImportException(Failure.TOO_LARGE)
             } ?: throw ImportException(Failure.UNREADABLE)
             try {
-                Result.success(normalize(sourceBytes))
+                Result.success(decodeSource(sourceBytes))
             } finally {
                 sourceBytes.fill(0)
             }
@@ -57,7 +63,7 @@ object CardFaceImageProcessor {
         }
     }
 
-    private fun normalize(sourceBytes: ByteArray): Prepared {
+    private fun decodeSource(sourceBytes: ByteArray): Bitmap {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size, bounds)
         if (bounds.outWidth !in 1..MAX_SOURCE_DIMENSION || bounds.outHeight !in 1..MAX_SOURCE_DIMENSION) {
@@ -75,44 +81,35 @@ object CardFaceImageProcessor {
         } else {
             decodeLegacy(sourceBytes, bounds)
         }
+        return decoded
+    }
+
+    suspend fun crop(source: Bitmap, region: CardCropGeometry): Result<Prepared> = withContext(Dispatchers.Default) {
         try {
-            val crop = centerCropSize(decoded.width, decoded.height, CARD_ASPECT_RATIO)
-            val left = ((decoded.width - crop.first) / 2).coerceAtLeast(0)
-            val top = ((decoded.height - crop.second) / 2).coerceAtLeast(0)
-            val cropped = Bitmap.createBitmap(decoded, left, top, crop.first, crop.second)
+            val width = minOf(OUTPUT_WIDTH, region.width.toInt()).coerceAtLeast(1)
+            val height = (width / CARD_ASPECT_RATIO).toInt().coerceAtLeast(1)
+            val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             try {
-                val width = minOf(OUTPUT_WIDTH, cropped.width).coerceAtLeast(1)
-                val height = (width / CARD_ASPECT_RATIO).toInt().coerceAtLeast(1)
-                val scaled = Bitmap.createScaledBitmap(cropped, width, height, true)
-                try {
-                    // A JPEG cannot retain transparency; use a predictable white background.
-                    val normalized = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    try {
-                        Canvas(normalized).apply {
-                            drawColor(Color.WHITE)
-                            drawBitmap(scaled, 0f, 0f, null)
-                        }
-                        val output = ByteArrayOutputStream()
-                        if (!normalized.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
-                            throw ImportException(Failure.DECODE_FAILED)
-                        }
-                        val bytes = output.toByteArray()
-                        if (bytes.isEmpty()) throw ImportException(Failure.DECODE_FAILED)
-                        val preview = normalized.copy(Bitmap.Config.ARGB_8888, false)
-                            ?: throw ImportException(Failure.DECODE_FAILED)
-                        return Prepared(bytes, preview)
-                    } finally {
-                        normalized.recycle()
-                    }
-                } finally {
-                    if (scaled !== cropped) scaled.recycle()
+                Canvas(output).apply {
+                    drawColor(Color.WHITE)
+                    val scale = width / region.width
+                    save()
+                    scale(scale, scale)
+                    translate(-region.left, -region.top)
+                    drawBitmap(source, 0f, 0f, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+                    restore()
                 }
-            } finally {
-                if (cropped !== decoded) cropped.recycle()
-            }
-        } finally {
-            decoded.recycle()
-        }
+                val bytes = ByteArrayOutputStream().use { buffer ->
+                    if (!output.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, buffer)) {
+                        throw ImportException(Failure.DECODE_FAILED)
+                    }
+                    buffer.toByteArray()
+                }
+                Result.success(Prepared(bytes, output.copy(Bitmap.Config.ARGB_8888, false)))
+            } finally { output.recycle() }
+        } catch (error: CancellationException) { throw error }
+        catch (_: OutOfMemoryError) { Result.failure(ImportException(Failure.DECODE_FAILED)) }
+        catch (_: Exception) { Result.failure(ImportException(Failure.DECODE_FAILED)) }
     }
 
     private fun decodeLegacy(sourceBytes: ByteArray, bounds: BitmapFactory.Options): Bitmap {

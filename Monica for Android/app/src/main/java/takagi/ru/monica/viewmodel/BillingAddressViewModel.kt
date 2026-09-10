@@ -64,14 +64,17 @@ class BillingAddressViewModel(
                 initialValue = emptyList()
             )
 
+    private val listDataCache = ItemDataSnapshotCache<BillingAddressData>()
+
     private val parsedBillingAddressesStateSource: Flow<LoadedListState<ParsedBillingAddressItem>> =
         allBillingAddressesSource
         .map { items ->
+            val parsed = listDataCache.parse(items) { parseAddressData(it) }
             LoadedListState(
-                items = items.map { item ->
+                items = items.mapIndexed { index, item ->
                     ParsedBillingAddressItem(
                         item = item,
-                        addressData = parseAddressData(item.itemData) ?: BillingAddressData()
+                        addressData = parsed[index] ?: BillingAddressData()
                     )
                 },
                 isReady = true,

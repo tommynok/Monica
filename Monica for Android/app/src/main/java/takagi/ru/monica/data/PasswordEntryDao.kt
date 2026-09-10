@@ -527,6 +527,13 @@ interface PasswordEntryDao {
     @Query("SELECT * FROM password_entries WHERE isDeleted = 0 AND isArchived = 0 ORDER BY isFavorite DESC, sortOrder ASC, updatedAt DESC")
     fun getActiveEntries(): Flow<List<PasswordEntry>>
 
+    // Do not materialize every password row just to find password-bound OTPs.
+    @Query("SELECT * FROM password_entries WHERE isDeleted = 0 AND isArchived = 0 AND authenticatorKey != '' ORDER BY isFavorite DESC, sortOrder ASC, updatedAt DESC")
+    fun getActiveAuthenticatorEntries(): Flow<List<PasswordEntry>>
+
+    @Query("SELECT id, title FROM password_entries WHERE isDeleted = 0 AND isArchived = 0")
+    fun getActivePasswordTitles(): Flow<List<PasswordTitle>>
+
     /**
      * 获取归档中的密码条目
      */

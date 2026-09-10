@@ -17,17 +17,21 @@ import androidx.compose.ui.unit.dp
  */
 val MonicaItemCardShape = RoundedCornerShape(8.dp)
 
+// ID-1 cards have an approximately 3.18 mm radius on a 53.98 mm short edge.
+val BankCardShape = RoundedCornerShape(percent = 6)
+
 /** Shared surface for compact vault items across list and tile layouts. */
 @Composable
 fun MonicaItemCard(
     isSelected: Boolean,
     modifier: Modifier = Modifier,
     transparentContainer: Boolean = false,
+    shape: androidx.compose.ui.graphics.Shape = MonicaItemCardShape,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
         modifier = modifier,
-        shape = MonicaItemCardShape,
+        shape = shape,
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {

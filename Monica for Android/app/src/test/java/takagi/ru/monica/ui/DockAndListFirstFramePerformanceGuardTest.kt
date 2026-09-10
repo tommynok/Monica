@@ -49,7 +49,11 @@ class DockAndListFirstFramePerformanceGuardTest {
         assertTrue(documentViewModelSource.contains("val parsedDocumentsReady"))
         assertTrue(addressViewModelSource.contains("val parsedBillingAddressesReady"))
         assertTrue(screenSource.contains("val walletItemsReady ="))
-        assertTrue(screenSource.contains("isReady = walletItemsReady"))
+        assertTrue(screenSource.contains("isReady = filteredState.isReady"))
+        val preparationSource = projectFile(
+            "app/src/main/java/takagi/ru/monica/ui/cardwallet/WalletListPreparation.kt"
+        ).readText()
+        assertTrue(preparationSource.contains("cards.isReady && documents.isReady && addresses.isReady"))
         assertFalse(screenSource.contains("bankLoading || documentLoading"))
     }
 

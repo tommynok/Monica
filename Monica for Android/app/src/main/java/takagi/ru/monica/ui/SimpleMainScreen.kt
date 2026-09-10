@@ -878,6 +878,7 @@ fun SimpleMainScreen(
     var onMoveToCategoryBankCards by remember { mutableStateOf({}) }
     var onDeleteSelectedBankCards by remember { mutableStateOf({}) }
     var onFavoriteBankCards by remember { mutableStateOf({}) }  // 添加收藏回调
+    var onStackWalletCards by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     // CardWallet state
     var cardWalletSubTab by rememberSaveable { mutableStateOf(CardWalletTab.ALL) }
@@ -1796,6 +1797,9 @@ fun SimpleMainScreen(
         },
         onDocumentSelectionModeChange = onCardWalletDocumentSelectionModeChange,
         onBankCardSelectionModeChange = onCardWalletBankCardSelectionModeChange,
+        onStackActionChange = { onStackWalletCards = it },
+        isDetailVisible = !isCompactWidth &&
+            (selectedBankCardId != null || selectedDocumentId != null || selectedBillingAddressId != null),
         onBitwardenScopeChanged = { vaultId ->
             cardWalletBitwardenVaultId = vaultId
         }
@@ -2260,6 +2264,7 @@ fun SimpleMainScreen(
                     onExitBankCardSelection = onExitBankCardSelection,
                     onSelectAllBankCards = onSelectAllBankCards,
                     onFavoriteBankCards = onFavoriteBankCards,
+                    onStackWalletCards = onStackWalletCards,
                     onMoveToCategoryBankCards = onMoveToCategoryBankCards,
                     onDeleteSelectedBankCards = onDeleteSelectedBankCards,
                     isDocumentSelectionMode = isDocumentSelectionMode,
@@ -2673,6 +2678,7 @@ fun SimpleMainScreen(
                 onExitBankCardSelection = onExitBankCardSelection,
                 onSelectAllBankCards = onSelectAllBankCards,
                 onFavoriteBankCards = onFavoriteBankCards,
+                onStackWalletCards = onStackWalletCards,
                 onMoveToCategoryBankCards = onMoveToCategoryBankCards,
                 onDeleteSelectedBankCards = onDeleteSelectedBankCards,
                 isDocumentSelectionMode = isDocumentSelectionMode,
@@ -3059,6 +3065,7 @@ fun SimpleMainScreen(
                     onExitBankCardSelection = onExitBankCardSelection,
                     onSelectAllBankCards = onSelectAllBankCards,
                     onFavoriteBankCards = onFavoriteBankCards,
+                    onStackWalletCards = onStackWalletCards,
                     onMoveToCategoryBankCards = onMoveToCategoryBankCards,
                     onDeleteSelectedBankCards = onDeleteSelectedBankCards,
                     isDocumentSelectionMode = isDocumentSelectionMode,

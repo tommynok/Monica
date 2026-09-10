@@ -75,7 +75,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -3444,7 +3443,7 @@ fun VaultV2Pane(
 			val contentPullOffset = pullAction.currentOffset.toInt()
 			val listInteractionModifier = Modifier
 				.offset { IntOffset(x = 0, y = contentPullOffset) }
-				.nestedScroll(pullAction.nestedScrollConnection)
+				.then(pullAction.gestureModifier)
 				.then(
 					if (sectionedItems.isEmpty() && folderRows.isEmpty()) {
 						Modifier.pointerInput(Unit) {

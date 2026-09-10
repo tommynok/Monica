@@ -15,7 +15,7 @@ android {
     // Intentionally frozen: same-signature sideloaded builds must remain mutually replaceable
     // for emergency rollback. Do not increment this value for routine releases.
     def appVersionCode = 12
-    def baseVersionName = previewVersionSuffix ? "1.0.310-${previewVersionSuffix}" : "1.0.310"
+    def baseVersionName = previewVersionSuffix ? "1.0.311-${previewVersionSuffix}" : "1.0.311"
     def normalizeTwoDigits = { raw ->
         def value = raw?.toString()?.trim()?.replaceAll('\\D', '')
         if (!value) {
@@ -151,6 +151,7 @@ android {
     buildFeatures {
         compose true
         buildConfig true
+        aidl true
     }
 
     applicationVariants.all { variant ->
@@ -229,6 +230,8 @@ dependencies {
     implementation libs.androidx.lifecycle.runtime.ktx
     implementation "androidx.lifecycle:lifecycle-process:2.8.7"
     implementation libs.androidx.activity.compose
+    implementation 'dev.rikka.shizuku:api:13.1.5'
+    implementation 'dev.rikka.shizuku:provider:13.1.5'
     // Pin profileinstaller to the latest stable patch and avoid older transitive copies.
     implementation "androidx.profileinstaller:profileinstaller:1.4.1"
     

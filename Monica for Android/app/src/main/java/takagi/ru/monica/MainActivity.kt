@@ -378,6 +378,11 @@ class MainActivity : BaseMonicaActivity() {
 
     // attachBaseContext 已由 BaseMonicaActivity 统一处理（语言、超时保护）
 
+    override fun onStart() {
+        super.onStart()
+        takagi.ru.monica.autofill_ng.protection.AutofillProtection.restoreIfEnabled(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState) // BaseMonicaActivity 已调用 enableEdgeToEdge()

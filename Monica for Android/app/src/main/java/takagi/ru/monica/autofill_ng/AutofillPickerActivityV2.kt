@@ -400,7 +400,10 @@ class AutofillPickerActivityV2 : BaseMonicaActivity() {
         }
         
         val database = PasswordDatabase.getDatabase(applicationContext)
-        val repository = PasswordRepository(database.passwordEntryDao())
+        val repository = PasswordRepository(
+            passwordEntryDao = database.passwordEntryDao(),
+            categoryDao = database.categoryDao(),
+        )
         val localKeePassDao = database.localKeePassDatabaseDao()
         val securityManager = SecurityManager(applicationContext)
         // settingsManager 已由 BaseMonicaActivity 初始化

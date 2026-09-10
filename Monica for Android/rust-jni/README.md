@@ -22,3 +22,9 @@ cargo ndk \
 ```
 
 生成的 `.so` 是构建产物，不应手工提交。正式 Release 和 Preview 工作流会在 Gradle 打包前执行同样的 native 构建。
+
+## 卡包首屏排序
+
+`RustListSortCore` 通过一个 `LongArray` 传入版本号及每行的收藏标记、排序号、ID、更新时间，返回原列表的索引排列。它不读取字符串、卡号或验证码密钥。批次版本、行宽和收藏值先验证，Kotlin 再校验返回值是完整排列；不可用时保持原 Kotlin 排序。
+
+页面在后台准备列表，小列表直接使用 Kotlin。Android `ListFirstFrameInstrumentedTest` 同时验证两种现有平局规则，并测量包含数组打包、JNI 拷贝和索引映射的完整调用开销，避免只比较 Rust 内部排序时间。

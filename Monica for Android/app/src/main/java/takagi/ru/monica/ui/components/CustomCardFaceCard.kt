@@ -70,6 +70,7 @@ fun CustomCardFaceCard(
     )
 
     MonicaItemCard(
+        shape = BankCardShape,
         modifier = modifier.aspectRatio(CardFaceImageProcessor.CARD_ASPECT_RATIO),
         isSelected = false,
         transparentContainer = true

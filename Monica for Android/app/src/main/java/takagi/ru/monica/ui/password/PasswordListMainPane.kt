@@ -2,7 +2,6 @@ package takagi.ru.monica.ui
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -11,10 +10,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
@@ -182,7 +179,7 @@ internal fun PasswordListMainPane(
                         .weight(1f)
                         .fillMaxWidth()
                         .offset { IntOffset(0, contentPullOffset) }
-                        .nestedScroll(pullAction.nestedScrollConnection),
+                        .then(pullAction.gestureModifier),
                     isPasswordPageListModelReady = isPasswordPageListModelReady,
                     hasVisibleQuickFilters = hasVisibleQuickFilters,
                     hasVisibleCategoryQuickFilters = hasVisibleCategoryQuickFilters,

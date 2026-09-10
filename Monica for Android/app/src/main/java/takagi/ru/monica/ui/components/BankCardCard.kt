@@ -114,6 +114,7 @@ fun BankCardCard(
     }
 
     MonicaItemCard(
+        shape = BankCardShape,
         modifier = cardInteractionModifier,
         isSelected = isSelected
     ) {

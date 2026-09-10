@@ -47,7 +47,7 @@ import takagi.ru.monica.data.model.CardBrandDetector
 import takagi.ru.monica.data.model.CardFaceDisplayMode
 import takagi.ru.monica.data.model.DocumentData
 import takagi.ru.monica.data.model.DocumentType
-import takagi.ru.monica.ui.components.MonicaItemCardShape
+import takagi.ru.monica.ui.components.BankCardShape
 
 /** Display content only. Images and persistence stay outside the drawing component. */
 data class CardFacePreviewData(
@@ -124,7 +124,7 @@ fun CardFaceArtwork(
     val showBrand = showBrandIcon && previewData.brand != null && displayMode != CardFaceDisplayMode.HIDDEN
     BoxWithConstraints(
         modifier = modifier
-            .clip(MonicaItemCardShape)
+            .clip(BankCardShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
     ) {
         val compact = maxWidth < 300.dp
