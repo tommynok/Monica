@@ -228,9 +228,9 @@
     <string name="group_mode_website">Группировать по сайту</string>
     <string name="group_mode_website_desc">Сначала сайт</string>
     <string name="website_stack_match_mode_title">Сопоставление сайтов в стопке</string>
-    <string name="website_stack_match_mode_desc">Строгое: только одинаковые сайты группируются. Нетстрогое: группировка по основному домену.</string>
+    <string name="website_stack_match_mode_desc">Строгое: только одинаковые сайты группируются. Нестрогое: группировка по основному домену.</string>
     <string name="website_stack_match_mode_strict">Строгое</string>
-    <string name="website_stack_match_mode_relaxed">Нетстрогое</string>
+    <string name="website_stack_match_mode_relaxed">Нестрогое</string>
     <string name="group_mode_app">Группировать по приложению</string>
     <string name="group_mode_app_desc">Название/пакет приложения</string>
     <string name="group_mode_title">Группировать по названию</string>
