@@ -224,7 +224,11 @@ fun PasswordFieldCustomizationScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 12.dp)
+                    ) {
                         Text(
                             text = stringResource(R.string.password_field_customization_preset_section_title),
                             style = MaterialTheme.typography.titleMedium,

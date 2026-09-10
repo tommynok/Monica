@@ -98,7 +98,7 @@ fun PermissionCard(
                             .weight(1f, fill = false)
                             .padding(end = 8.dp),
                         maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Clip
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                     // 重要性标签
                     PermissionImportanceChip(
@@ -193,6 +193,7 @@ fun PermissionStatusIndicator(status: PermissionStatus) {
     }
 
     Column(
+        modifier = Modifier.width(76.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
@@ -204,7 +205,10 @@ fun PermissionStatusIndicator(status: PermissionStatus) {
         Text(
             text = stringResource(textResId),
             style = MaterialTheme.typography.labelSmall,
-            color = color
+            color = color,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }
 }
