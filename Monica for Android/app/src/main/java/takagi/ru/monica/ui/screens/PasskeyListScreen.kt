@@ -113,6 +113,8 @@ import takagi.ru.monica.passkey.PasskeyPrivateKeyStore
 import takagi.ru.monica.passkey.managementKey
 import takagi.ru.monica.passkey.managementRecordIdOrNull
 import takagi.ru.monica.ui.common.pull.rememberPullActionState
+import takagi.ru.monica.ui.common.pull.PullSearchDefaults
+import takagi.ru.monica.ui.common.pull.PullSearchHint
 
 /**
  * Passkey 列表屏幕
@@ -436,7 +438,7 @@ fun PasskeyListScreen(
     } == true
 
     val searchTriggerDistance = remember(density, isBitwardenDatabaseView) {
-        with(density) { (if (isBitwardenDatabaseView) 40.dp else 72.dp).toPx() }
+        with(density) { (if (isBitwardenDatabaseView) 40.dp else PullSearchDefaults.TriggerDistance).toPx() }
     }
     val syncTriggerDistance = remember(density) { with(density) { 72.dp.toPx() } }
     val maxDragDistance = remember(density) { with(density) { 100.dp.toPx() } }
@@ -880,11 +882,8 @@ fun PasskeyListScreen(
         
         // 主内容 + 左下角胶囊多选栏
         Box(modifier = Modifier.fillMaxSize()) {
-            val contentPullOffset = if (isBitwardenDatabaseView) {
-                (currentOffset * 0.28f).toInt()
-            } else {
-                currentOffset.toInt()
-            }
+            val contentPullOffset = currentOffset.toInt()
+            PullSearchHint(currentOffset = currentOffset, triggerDistance = searchTriggerDistance)
 
             Column(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -2262,4 +2261,3 @@ private fun PasskeyEntry.passkeyReferenceDedupKey(): String {
         append(userDisplayName.trim().lowercase())
     }
 }
-

@@ -95,6 +95,7 @@ import takagi.ru.monica.steam.market.SteamMarketHistoryPoint
 import takagi.ru.monica.steam.market.SteamMarketListing
 import takagi.ru.monica.steam.market.SteamWalletInfo
 import takagi.ru.monica.ui.common.pull.PullToSearchStateHandle
+import takagi.ru.monica.ui.common.pull.PullSearchHint
 import takagi.ru.monica.ui.common.selection.SelectionActionBar
 import takagi.ru.monica.ui.components.MonicaModalBottomSheet
 
@@ -145,6 +146,7 @@ internal fun SteamInventoryContent(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        PullSearchHint(currentOffset = pullToSearch.currentOffset)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -337,6 +339,7 @@ internal fun SteamMarketListingsContent(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        PullSearchHint(currentOffset = pullToSearch.currentOffset)
         Column(
             modifier = Modifier
                 .fillMaxSize()

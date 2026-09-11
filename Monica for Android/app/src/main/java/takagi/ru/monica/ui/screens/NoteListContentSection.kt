@@ -43,6 +43,8 @@ import takagi.ru.monica.ui.common.state.rememberSaveableLazyListState
 import takagi.ru.monica.ui.common.state.rememberSaveableLazyGridState
 import takagi.ru.monica.ui.common.state.resolveMergedListRenderState
 import takagi.ru.monica.ui.common.pull.rememberPullActionState
+import takagi.ru.monica.ui.common.pull.PullSearchDefaults
+import takagi.ru.monica.ui.common.pull.PullSearchHint
 
 @Composable
 fun NoteListContent(
@@ -64,7 +66,7 @@ fun NoteListContent(
     val listState = rememberSaveableLazyListState()
     val gridState = rememberSaveableLazyGridState()
     val searchTriggerDistance = remember(density, isBitwardenDatabaseView) {
-        with(density) { (if (isBitwardenDatabaseView) 40.dp else 72.dp).toPx() }
+        with(density) { (if (isBitwardenDatabaseView) 40.dp else PullSearchDefaults.TriggerDistance).toPx() }
     }
     val syncTriggerDistance = remember(density) { with(density) { 72.dp.toPx() } }
     val maxDragDistance = remember(density) { with(density) { 100.dp.toPx() } }
@@ -87,27 +89,23 @@ fun NoteListContent(
         )
     }
 
-    val contentPullOffset = if (isBitwardenDatabaseView) {
-        (currentOffset * 0.28f).toInt()
-    } else {
-        currentOffset.toInt()
-    }
+    val contentPullOffset = currentOffset.toInt()
     // Do not display cached notes until their saved scope is ready.
     val initialRenderState = resolveMergedListRenderState(
         isReady = !isInitialLoading,
         itemCount = notes.size,
     )
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
     ) {
+        PullSearchHint(currentOffset = currentOffset, triggerDistance = searchTriggerDistance)
         when (initialRenderState) {
             InitialListRenderState.Loading -> {
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
+                        .fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     androidx.compose.material3.CircularProgressIndicator()
@@ -116,8 +114,7 @@ fun NoteListContent(
             InitialListRenderState.Empty -> {
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                        .fillMaxSize()
                         .offset { IntOffset(0, contentPullOffset) }
                         .then(emptyStateGestureModifier),
                     contentAlignment = Alignment.Center

@@ -2472,7 +2472,7 @@
     <string name="password_owner_conflict_inline">Запись принадлежит нескольким хранилищам. Исправьте перед редактированием.</string>
     <string name="password_owner_conflict_display">Конфликт хранилищ между Monica, KeePass и Bitwarden. Исправьте перед редактированием.</string>
     <string name="password_owner_conflict_copy">Конфликт владельца, пароль не может быть безопасно скопирован.</string>
-    <string name="pull_release_to_search">Отпустите для поиска</string>
+    <string name="pull_release_to_search">Потяните вниз для поиска</string>
     <string name="pull_release_to_sync_bitwarden">Отпустите для синхронизации Bitwarden</string>
     <string name="pull_syncing_bitwarden">Синхронизация Bitwarden...</string>
     <string name="pull_sync_requires_bitwarden_login">Сначала войдите и разблокируйте Bitwarden</string>

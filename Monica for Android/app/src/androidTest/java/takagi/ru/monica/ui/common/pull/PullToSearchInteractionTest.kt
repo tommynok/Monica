@@ -79,7 +79,7 @@ class PullToSearchInteractionTest {
                 } else {
                     rememberPullToSearchState(
                         isSearchExpanded = expanded,
-                        searchTriggerDistance = with(density) { 72.dp.toPx() },
+                        searchTriggerDistance = with(density) { PullSearchDefaults.TriggerDistance.toPx() },
                         maxDragDistance = with(density) { 100.dp.toPx() },
                         onSearchTriggered = { expanded = true },
                     )
@@ -196,6 +196,18 @@ class PullToSearchInteractionTest {
         pullDown(distanceFraction = 0.08f)
         release()
         compose.runOnIdle { assertFalse(expanded) }
+    }
+
+    @Test
+    fun anOrdinaryTopSwipeDoesNotOpenSearchButADeliberatePullDoes() {
+        show()
+        pullDown(distanceFraction = 0.25f)
+        release()
+        compose.runOnIdle { assertFalse(expanded) }
+        compose.mainClock.advanceTimeBy(300)
+        pullDown()
+        release()
+        compose.runOnIdle { assertTrue(expanded) }
     }
 
     @Test

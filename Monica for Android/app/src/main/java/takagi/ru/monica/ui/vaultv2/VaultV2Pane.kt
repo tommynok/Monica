@@ -152,6 +152,8 @@ import takagi.ru.monica.ui.components.GroupedItemDefaults
 import takagi.ru.monica.ui.icons.PASSWORD_ICON_TYPE_NONE
 import takagi.ru.monica.ui.icons.VaultItemIcon
 import takagi.ru.monica.ui.common.pull.rememberPullActionState
+import takagi.ru.monica.ui.common.pull.PullSearchDefaults
+import takagi.ru.monica.ui.common.pull.PullSearchHint
 import takagi.ru.monica.ui.PasswordQuickFolderBreadcrumb
 import takagi.ru.monica.ui.PasswordQuickFolderBreadcrumbPath
 import takagi.ru.monica.ui.PasswordQuickFolderBreadcrumbBanner
@@ -1697,7 +1699,7 @@ fun VaultV2Pane(
 		takagi.ru.monica.bitwarden.repository.BitwardenRepository.getInstance(context)
 	}
 	val bitwardenSyncStatusByVault by bitwardenViewModel.syncStatusByVault.collectAsState()
-	val pullSearchTriggerDistance = remember(density) { with(density) { 40.dp.toPx() } }
+	val pullSearchTriggerDistance = remember(density) { with(density) { PullSearchDefaults.TriggerDistance.toPx() } }
 	val pullSyncTriggerDistance = remember(density) { with(density) { 72.dp.toPx() } }
 	val pullMaxDragDistance = remember(density) { with(density) { 100.dp.toPx() } }
 	val pullAction = rememberPullActionState(
@@ -3650,6 +3652,11 @@ fun VaultV2Pane(
 					.fillMaxWidth()
 					.then(listInteractionModifier),
 			) {
+			PullSearchHint(
+				currentOffset = pullAction.currentOffset,
+				triggerDistance = pullSearchTriggerDistance,
+				modifier = Modifier.offset { IntOffset(0, -contentPullOffset) },
+			)
 			VaultV2List(
 				hasVisibleQuickFilters = showQuickFiltersInList,
 				hasVisibleCategoryQuickFilters = showCategoryQuickFiltersInList,

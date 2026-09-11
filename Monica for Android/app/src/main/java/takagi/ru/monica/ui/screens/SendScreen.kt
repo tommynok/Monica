@@ -137,6 +137,8 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import takagi.ru.monica.ui.common.pull.rememberPullToSearchState
+import takagi.ru.monica.ui.common.pull.PullSearchDefaults
+import takagi.ru.monica.ui.common.pull.PullSearchHint
 
 private enum class SendCreateType {
     Text,
@@ -180,7 +182,7 @@ fun SendScreen(
     var searchQuery by remember { mutableStateOf("") }
     var isSearchExpanded by remember { mutableStateOf(false) }
     var showTopActionsMenu by remember { mutableStateOf(false) }
-    val triggerDistance = with(LocalDensity.current) { 72.dp.toPx() }
+    val triggerDistance = with(LocalDensity.current) { PullSearchDefaults.TriggerDistance.toPx() }
     val pullSearch = rememberPullToSearchState(
         isSearchExpanded = isSearchExpanded,
         searchTriggerDistance = triggerDistance,
@@ -343,80 +345,82 @@ fun SendScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                when {
-                    // 没有任何已连接 Vault：保留原"未连接"提示
-                    allVaults.isEmpty() -> {
-                        EmptyStateCard(
-                            title = stringResource(R.string.send_empty_no_connection_title),
-                            message = stringResource(R.string.send_empty_no_connection_message)
-                        )
-                    }
-                    // 有 Vault 但没有任何已解锁、并且本地也没有跨账号的 Send 缓存可用
-                    !anyVaultUnlocked && sends.isEmpty() -> {
-                        EmptyStateCard(
-                            title = stringResource(R.string.send_empty_vault_locked_title),
-                            message = stringResource(R.string.send_empty_vault_locked_message)
-                        )
-                    }
-                    sends.isEmpty() && sendState == BitwardenViewModel.SendState.Loading -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    PullSearchHint(currentOffset = currentOffset, triggerDistance = triggerDistance)
+                    when {
+                        // 没有任何已连接 Vault：保留原"未连接"提示
+                        allVaults.isEmpty() -> {
+                            EmptyStateCard(
+                                title = stringResource(R.string.send_empty_no_connection_title),
+                                message = stringResource(R.string.send_empty_no_connection_message)
+                            )
                         }
-                    }
-                    sends.isEmpty() -> {
-                        EmptyStateCard(
-                            title = stringResource(R.string.send_empty_none_title),
-                            message = stringResource(R.string.send_empty_none_message)
-                        )
-                    }
-                    filteredSends.isEmpty() -> {
-                        EmptyStateCard(
-                            title = stringResource(R.string.send_empty_no_match_title),
-                            message = stringResource(R.string.send_empty_no_match_message)
-                        )
-                    }
-                    else -> {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .offset { IntOffset(0, currentOffset.toInt()) }
-                                .then(pullSearch.gestureModifier),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            contentPadding = PaddingValues(bottom = 96.dp)
-                        ) {
-                            items(
-                                items = filteredSends,
-                                // 跨账号视图下，单独的 sendId 不再唯一（不同 vault 间会重复），
-                                // 用 vaultId+sendId 复合键避免 LazyColumn key 冲突。
-                                key = { "${it.vaultId}:${it.bitwardenSendId}" }
-                            ) { send ->
-                                val vault = vaultLookup[send.vaultId]
-                                val vaultLabel = vault?.let {
-                                    it.displayName?.takeIf { name -> name.isNotBlank() } ?: it.email
-                                }.orEmpty()
-                                val vaultServer = vault?.serverUrl.orEmpty()
-                                SendItemCard(
-                                    send = send,
-                                    selected = selectedSendId == send.bitwardenSendId,
-                                    vaultLabel = vaultLabel,
-                                    vaultServerUrl = vaultServer,
-                                    onClick = { onSendClick(send) },
-                                    onCopyLink = {
-                                        clipboardManager.setText(AnnotatedString(send.shareUrl))
-                                    },
-                                    onOpenLink = {
-                                        runCatching {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(send.shareUrl))
-                                            context.startActivity(intent)
-                                        }
-                                    },
-                                    onDelete = { deletingSend = send }
-                                )
+                        // 有 Vault 但没有任何已解锁、并且本地也没有跨账号的 Send 缓存可用
+                        !anyVaultUnlocked && sends.isEmpty() -> {
+                            EmptyStateCard(
+                                title = stringResource(R.string.send_empty_vault_locked_title),
+                                message = stringResource(R.string.send_empty_vault_locked_message)
+                            )
+                        }
+                        sends.isEmpty() && sendState == BitwardenViewModel.SendState.Loading -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                        sends.isEmpty() -> {
+                            EmptyStateCard(
+                                title = stringResource(R.string.send_empty_none_title),
+                                message = stringResource(R.string.send_empty_none_message)
+                            )
+                        }
+                        filteredSends.isEmpty() -> {
+                            EmptyStateCard(
+                                title = stringResource(R.string.send_empty_no_match_title),
+                                message = stringResource(R.string.send_empty_no_match_message)
+                            )
+                        }
+                        else -> {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .offset { IntOffset(0, currentOffset.toInt()) }
+                                    .then(pullSearch.gestureModifier),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                contentPadding = PaddingValues(bottom = 96.dp)
+                            ) {
+                                items(
+                                    items = filteredSends,
+                                    // 跨账号视图下，单独的 sendId 不再唯一（不同 vault 间会重复），
+                                    // 用 vaultId+sendId 复合键避免 LazyColumn key 冲突。
+                                    key = { "${it.vaultId}:${it.bitwardenSendId}" }
+                                ) { send ->
+                                    val vault = vaultLookup[send.vaultId]
+                                    val vaultLabel = vault?.let {
+                                        it.displayName?.takeIf { name -> name.isNotBlank() } ?: it.email
+                                    }.orEmpty()
+                                    val vaultServer = vault?.serverUrl.orEmpty()
+                                    SendItemCard(
+                                        send = send,
+                                        selected = selectedSendId == send.bitwardenSendId,
+                                        vaultLabel = vaultLabel,
+                                        vaultServerUrl = vaultServer,
+                                        onClick = { onSendClick(send) },
+                                        onCopyLink = {
+                                            clipboardManager.setText(AnnotatedString(send.shareUrl))
+                                        },
+                                        onOpenLink = {
+                                            runCatching {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(send.shareUrl))
+                                                context.startActivity(intent)
+                                            }
+                                        },
+                                        onDelete = { deletingSend = send }
+                                    )
+                                }
                             }
                         }
                     }

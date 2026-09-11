@@ -233,6 +233,7 @@ import takagi.ru.monica.ui.common.layout.ListPane
 import takagi.ru.monica.ui.common.pull.PullActionVisualState
 import takagi.ru.monica.ui.common.pull.PullGestureIndicator
 import takagi.ru.monica.ui.common.pull.rememberPullActionState
+import takagi.ru.monica.ui.common.pull.PullSearchDefaults
 import takagi.ru.monica.ui.common.selection.CategoryListItem
 import takagi.ru.monica.ui.common.selection.SelectionActionBar
 import takagi.ru.monica.ui.common.selection.SelectionModeTopBar
@@ -823,7 +824,7 @@ fun PasswordListContent(
     val density = androidx.compose.ui.platform.LocalDensity.current
     
     // Pull-to-search/sync state (shared implementation)
-    val triggerDistance = remember(density) { with(density) { 40.dp.toPx() } }
+    val triggerDistance = remember(density) { with(density) { PullSearchDefaults.TriggerDistance.toPx() } }
     val syncTriggerDistance = remember(density) { with(density) { 72.dp.toPx() } }
     val maxDragDistance = remember(density) { with(density) { 100.dp.toPx() } }
     val pullAction = rememberPullActionState(

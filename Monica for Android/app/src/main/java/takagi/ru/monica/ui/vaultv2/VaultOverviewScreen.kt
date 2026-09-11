@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +36,9 @@ import takagi.ru.monica.security.SecurityManager
 import takagi.ru.monica.ui.components.ExpressiveTopBar
 import takagi.ru.monica.ui.components.GroupedItemDefaults
 import takagi.ru.monica.ui.icons.VaultItemIcon
+import takagi.ru.monica.ui.common.pull.PullSearchDefaults
+import takagi.ru.monica.ui.common.pull.PullSearchHint
+import takagi.ru.monica.ui.common.pull.rememberPullToSearchState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,6 +87,14 @@ internal fun VaultOverviewScreen(
     LaunchedEffect(currentScope, cardsVisible, selectedSource?.locked) {
         if (!cardsVisible || selectedSource?.locked == true) cardStackState.clear()
     }
+    val density = LocalDensity.current
+    val searchTriggerDistance = with(density) { PullSearchDefaults.TriggerDistance.toPx() }
+    val pullSearch = rememberPullToSearchState(
+        isSearchExpanded = isDetailVisible,
+        searchTriggerDistance = searchTriggerDistance,
+        maxDragDistance = with(density) { 100.dp.toPx() },
+        onSearchTriggered = onSearch,
+    )
     Column(modifier.fillMaxSize().testTag("vault_overview_screen")) {
         ExpressiveTopBar(
             title = stringResource(R.string.vault_overview_title),
@@ -119,103 +132,109 @@ internal fun VaultOverviewScreen(
         } else if (snapshot == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         } else {
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).testTag("overview_modules"),
-                userScrollEnabled = !cardStackState.expanded || isDetailVisible,
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 116.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                if (currentScope == "all" && sources.any { it.locked }) item(key = "locked_notice") {
-                    Text(stringResource(R.string.vault_overview_locked_excluded, sources.count { it.locked }),
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                items(visibleModules, key = { it.name }, contentType = { it.name }) { module ->
-                    val collapsed = module.name in config.collapsed
-                    val count = when (module) {
-                        VaultOverviewModule.CARDS -> snapshot.cards.size
-                        VaultOverviewModule.ITEMS -> snapshot.frequentItems.size
-                        VaultOverviewModule.FAVORITES -> snapshot.favorites.size
-                        VaultOverviewModule.FOLDERS -> snapshot.folders.size
-                        VaultOverviewModule.DATABASES -> sources.size
-                        else -> null
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                PullSearchHint(currentOffset = pullSearch.currentOffset, triggerDistance = searchTriggerDistance)
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()
+                    .offset { IntOffset(0, pullSearch.currentOffset.toInt()) }
+                    .then(pullSearch.gestureModifier)
+                    .testTag("overview_modules"),
+                    userScrollEnabled = !cardStackState.expanded || isDetailVisible,
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 116.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    if (currentScope == "all" && sources.any { it.locked }) item(key = "locked_notice") {
+                        Text(stringResource(R.string.vault_overview_locked_excluded, sources.count { it.locked }),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (module == VaultOverviewModule.ARCHIVE || module == VaultOverviewModule.TRASH) {
-                        OverviewNavigationRow(
-                            title = stringResource(module.titleRes()),
-                            icon = if (module == VaultOverviewModule.ARCHIVE) Icons.Default.Archive else Icons.Default.DeleteOutline,
-                            count = if (module == VaultOverviewModule.ARCHIVE) snapshot.archiveCount else trashCount,
-                            onClick = if (module == VaultOverviewModule.ARCHIVE) onArchive else onTrash,
-                            modifier = Modifier.testTag("overview_${module.name.lowercase()}"),
-                        )
-                    } else Column(Modifier.testTag("overview_${module.name.lowercase()}")) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Row(Modifier.weight(1f).testTag("overview_toggle_${module.name}").clickable(role = Role.Button) {
-                                onConfigChange { it.copy(collapsed = if (collapsed) it.collapsed - module.name else it.collapsed + module.name) }
-                            }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(if (collapsed) Icons.Default.ChevronRight else Icons.Default.ExpandMore, null, Modifier.size(18.dp))
-                                Text(stringResource(module.titleRes()), Modifier.padding(start = 6.dp),
-                                    style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                                count?.let { Text(it.toString(), Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            }
-                            if (module == VaultOverviewModule.CARDS || module == VaultOverviewModule.ITEMS) {
-                                IconButton(onClick = { pinModule = module.name }, modifier = Modifier.testTag("overview_pin_${module.name.lowercase()}")) {
-                                    Icon(Icons.Default.Add, stringResource(if (module == VaultOverviewModule.CARDS) R.string.vault_overview_pin_cards else R.string.vault_overview_pin_items))
-                                }
-                            } else if (module == VaultOverviewModule.FAVORITES) {
-                                TextButton(onClick = onFavorites) { Text(stringResource(R.string.vault_overview_view_all)) }
-                            }
+                    items(visibleModules, key = { it.name }, contentType = { it.name }) { module ->
+                        val collapsed = module.name in config.collapsed
+                        val count = when (module) {
+                            VaultOverviewModule.CARDS -> snapshot.cards.size
+                            VaultOverviewModule.ITEMS -> snapshot.frequentItems.size
+                            VaultOverviewModule.FAVORITES -> snapshot.favorites.size
+                            VaultOverviewModule.FOLDERS -> snapshot.folders.size
+                            VaultOverviewModule.DATABASES -> sources.size
+                            else -> null
                         }
-                        if (!collapsed) when (module) {
-                            VaultOverviewModule.CARDS -> if (snapshot.cards.isEmpty()) OverviewEmpty(R.string.vault_overview_empty_cards)
-                                else OverviewCards(walletCards, sourceByKey, selectedCardKey, listState,
-                                    cardStackState, isDetailVisible, onManage = { pinModule = VaultOverviewModule.CARDS.name })
-                            VaultOverviewModule.ITEMS, VaultOverviewModule.FAVORITES -> {
-                                val rows = if (module == VaultOverviewModule.ITEMS) snapshot.frequentItems else snapshot.favorites
-                                if (rows.isEmpty()) OverviewEmpty(if (module == VaultOverviewModule.ITEMS) R.string.vault_overview_empty_items else R.string.vault_overview_empty_favorites)
-                                else Column(verticalArrangement = Arrangement.spacedBy(GroupedItemDefaults.Spacing)) {
-                                    val preview = rows.take(if (module == VaultOverviewModule.ITEMS) OVERVIEW_PREVIEW_LIMIT else 3)
-                                    preview.forEachIndexed { index, row ->
-                                        key(row.key) {
-                                            OverviewItemRow(
-                                                item = row,
-                                                source = sourceByKey[row.overviewSource()]?.name.takeIf { currentScope == "all" },
-                                                shape = GroupedItemDefaults.shape(index, preview.size),
-                                                onClick = { onOpenItem(row) },
-                                            )
+                        if (module == VaultOverviewModule.ARCHIVE || module == VaultOverviewModule.TRASH) {
+                            OverviewNavigationRow(
+                                title = stringResource(module.titleRes()),
+                                icon = if (module == VaultOverviewModule.ARCHIVE) Icons.Default.Archive else Icons.Default.DeleteOutline,
+                                count = if (module == VaultOverviewModule.ARCHIVE) snapshot.archiveCount else trashCount,
+                                onClick = if (module == VaultOverviewModule.ARCHIVE) onArchive else onTrash,
+                                modifier = Modifier.testTag("overview_${module.name.lowercase()}"),
+                            )
+                        } else Column(Modifier.testTag("overview_${module.name.lowercase()}")) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(Modifier.weight(1f).testTag("overview_toggle_${module.name}").clickable(role = Role.Button) {
+                                    onConfigChange { it.copy(collapsed = if (collapsed) it.collapsed - module.name else it.collapsed + module.name) }
+                                }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(if (collapsed) Icons.Default.ChevronRight else Icons.Default.ExpandMore, null, Modifier.size(18.dp))
+                                    Text(stringResource(module.titleRes()), Modifier.padding(start = 6.dp),
+                                        style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                    count?.let { Text(it.toString(), Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                }
+                                if (module == VaultOverviewModule.CARDS || module == VaultOverviewModule.ITEMS) {
+                                    IconButton(onClick = { pinModule = module.name }, modifier = Modifier.testTag("overview_pin_${module.name.lowercase()}")) {
+                                        Icon(Icons.Default.Add, stringResource(if (module == VaultOverviewModule.CARDS) R.string.vault_overview_pin_cards else R.string.vault_overview_pin_items))
+                                    }
+                                } else if (module == VaultOverviewModule.FAVORITES) {
+                                    TextButton(onClick = onFavorites) { Text(stringResource(R.string.vault_overview_view_all)) }
+                                }
+                            }
+                            if (!collapsed) when (module) {
+                                VaultOverviewModule.CARDS -> if (snapshot.cards.isEmpty()) OverviewEmpty(R.string.vault_overview_empty_cards)
+                                    else OverviewCards(walletCards, sourceByKey, selectedCardKey, listState,
+                                        cardStackState, isDetailVisible, onManage = { pinModule = VaultOverviewModule.CARDS.name })
+                                VaultOverviewModule.ITEMS, VaultOverviewModule.FAVORITES -> {
+                                    val rows = if (module == VaultOverviewModule.ITEMS) snapshot.frequentItems else snapshot.favorites
+                                    if (rows.isEmpty()) OverviewEmpty(if (module == VaultOverviewModule.ITEMS) R.string.vault_overview_empty_items else R.string.vault_overview_empty_favorites)
+                                    else Column(verticalArrangement = Arrangement.spacedBy(GroupedItemDefaults.Spacing)) {
+                                        val preview = rows.take(if (module == VaultOverviewModule.ITEMS) OVERVIEW_PREVIEW_LIMIT else 3)
+                                        preview.forEachIndexed { index, row ->
+                                            key(row.key) {
+                                                OverviewItemRow(
+                                                    item = row,
+                                                    source = sourceByKey[row.overviewSource()]?.name.takeIf { currentScope == "all" },
+                                                    shape = GroupedItemDefaults.shape(index, preview.size),
+                                                    onClick = { onOpenItem(row) },
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            VaultOverviewModule.TYPES -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                VaultV2ItemType.entries.chunked(2).forEach { pair -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    pair.forEach { type -> OverviewNavigationRow(stringResource(type.titleRes()), type.icon(),
-                                        snapshot.typeCounts[type] ?: 0, { onOpenType(type) }, Modifier.weight(1f).testTag("overview_type_${type.name}")) }
-                                    if (pair.size == 1) Spacer(Modifier.weight(1f))
-                                } }
-                            }
-                            VaultOverviewModule.FOLDERS -> {
-                                if (snapshot.folders.isEmpty()) OverviewEmpty(R.string.vault_overview_empty_folders)
-                                else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    snapshot.folders.take(6).forEach { folder -> OverviewFolderRow(folder, sourceByKey, currentScope, onOpenFolder) }
-                                    if (snapshot.folders.size > 6) TextButton(onClick = { showAllFolders = true }) {
-                                        Text(stringResource(R.string.vault_overview_folder_list))
+                                VaultOverviewModule.TYPES -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    VaultV2ItemType.entries.chunked(2).forEach { pair -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        pair.forEach { type -> OverviewNavigationRow(stringResource(type.titleRes()), type.icon(),
+                                            snapshot.typeCounts[type] ?: 0, { onOpenType(type) }, Modifier.weight(1f).testTag("overview_type_${type.name}")) }
+                                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                                    } }
+                                }
+                                VaultOverviewModule.FOLDERS -> {
+                                    if (snapshot.folders.isEmpty()) OverviewEmpty(R.string.vault_overview_empty_folders)
+                                    else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        snapshot.folders.take(6).forEach { folder -> OverviewFolderRow(folder, sourceByKey, currentScope, onOpenFolder) }
+                                        if (snapshot.folders.size > 6) TextButton(onClick = { showAllFolders = true }) {
+                                            Text(stringResource(R.string.vault_overview_folder_list))
+                                        }
                                     }
                                 }
+                                VaultOverviewModule.DATABASES -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    sources.forEach { source -> OverviewSourceRow(source, snapshot.sourceCounts[source.key],
+                                        selected = source.key == currentScope, onClick = {
+                                            if (source.locked) onSelectScope(source.key) else onOpenSource(source.key)
+                                        }) }
+                                }
+                                else -> Unit
                             }
-                            VaultOverviewModule.DATABASES -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                sources.forEach { source -> OverviewSourceRow(source, snapshot.sourceCounts[source.key],
-                                    selected = source.key == currentScope, onClick = {
-                                        if (source.locked) onSelectScope(source.key) else onOpenSource(source.key)
-                                    }) }
-                            }
-                            else -> Unit
                         }
                     }
-                }
-                if (visibleModules.isEmpty()) item { OverviewEmpty(R.string.vault_overview_hidden_hint) }
-                item(key = "all_items") {
-                    FilledTonalButton(onClick = onAllItems, modifier = Modifier.fillMaxWidth().testTag("overview_all_items")) {
-                        Text(stringResource(R.string.vault_overview_all_items))
-                        Icon(Icons.Default.ChevronRight, null, Modifier.padding(start = 8.dp).size(18.dp))
+                    if (visibleModules.isEmpty()) item { OverviewEmpty(R.string.vault_overview_hidden_hint) }
+                    item(key = "all_items") {
+                        FilledTonalButton(onClick = onAllItems, modifier = Modifier.fillMaxWidth().testTag("overview_all_items")) {
+                            Text(stringResource(R.string.vault_overview_all_items))
+                            Icon(Icons.Default.ChevronRight, null, Modifier.padding(start = 8.dp).size(18.dp))
+                        }
                     }
                 }
             }

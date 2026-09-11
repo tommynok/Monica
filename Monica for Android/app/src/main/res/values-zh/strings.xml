@@ -2925,7 +2925,7 @@
     <string name="password_owner_conflict_inline">这条数据同时绑定了多个密码库，修复归属冲突前已禁止编辑保存。</string>
     <string name="password_owner_conflict_display">这条数据当前存在存储归属冲突。需要先修复 Monica 本地、KeePass 与 Bitwarden 的所有权冲突，才能继续编辑。</string>
     <string name="password_owner_conflict_copy">这条数据存在归属冲突，当前不能安全复制密码。</string>
-    <string name="pull_release_to_search">下拉进行搜索</string>
+    <string name="pull_release_to_search">下拉以进行搜索</string>
     <string name="pull_release_to_sync_bitwarden">松手进行 Bitwarden 同步</string>
     <string name="pull_syncing_bitwarden">正在同步 Bitwarden...</string>
     <string name="pull_sync_requires_bitwarden_login">请先登录并解锁 Bitwarden</string>

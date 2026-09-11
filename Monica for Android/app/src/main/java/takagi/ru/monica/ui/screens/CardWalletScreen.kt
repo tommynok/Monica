@@ -172,6 +172,8 @@ import takagi.ru.monica.viewmodel.PasswordViewModel
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import takagi.ru.monica.ui.common.pull.rememberPullActionState
+import takagi.ru.monica.ui.common.pull.PullSearchDefaults
+import takagi.ru.monica.ui.common.pull.PullSearchHint
 
 enum class CardWalletTab {
     ALL,
@@ -360,7 +362,7 @@ fun CardWalletScreen(
         bitwardenSyncStatusByVault[vaultId].isUserVisibleSyncInProgress()
     } == true
     val searchTriggerDistance = remember(density, isBitwardenDatabaseView) {
-        with(density) { (if (isBitwardenDatabaseView) 40.dp else 72.dp).toPx() }
+        with(density) { (if (isBitwardenDatabaseView) 40.dp else PullSearchDefaults.TriggerDistance).toPx() }
     }
     val syncTriggerDistance = remember(density) { with(density) { 72.dp.toPx() } }
     val maxDragDistance = remember(density) { with(density) { 100.dp.toPx() } }
@@ -1054,14 +1056,21 @@ fun CardWalletScreen(
             }
         )
 
-        val contentPullOffset = if (isBitwardenDatabaseView) {
-            (currentOffset * 0.28f).toInt()
-        } else {
-            currentOffset.toInt()
-        }
+        val contentPullOffset = currentOffset.toInt()
 
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxSize()) {
+                PullSearchHint(
+                    currentOffset = currentOffset,
+                    triggerDistance = searchTriggerDistance,
+                    text = stringResource(
+                        when {
+                            pullAction.isBitwardenSyncing -> R.string.pull_syncing_bitwarden
+                            pullAction.syncHintArmed -> R.string.pull_release_to_sync_bitwarden
+                            else -> R.string.pull_release_to_search
+                        }
+                    ),
+                )
                 when {
                     initialRenderState == InitialListRenderState.Loading -> LoadingIndicator()
                     initialRenderState == InitialListRenderState.Empty -> {
