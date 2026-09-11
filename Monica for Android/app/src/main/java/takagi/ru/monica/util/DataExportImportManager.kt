@@ -5,6 +5,7 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
+import takagi.ru.monica.R
 import takagi.ru.monica.data.model.BankCardData
 import takagi.ru.monica.data.model.NoteData
 import takagi.ru.monica.data.model.SecureCustomField
@@ -201,7 +202,7 @@ class DataExportImportManager(private val context: Context) {
             }
 
             if (items.isEmpty()) {
-                Result.failure(Exception("未能导入任何数据，请检查文件格式"))
+                Result.failure(Exception(context.getString(R.string.import_csv_no_data_found)))
             } else {
                 Result.success(items)
             }

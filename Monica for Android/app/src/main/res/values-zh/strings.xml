@@ -3399,6 +3399,7 @@
     <string name="import_type_stratum_title">Stratum Auth</string>
     <string name="import_type_stratum_desc">导入 Stratum/AuthPro 备份（.stratum/.txt/.html）</string>
     <string name="import_type_stratum_file_hint">选择 .stratum / .txt / .html 文件</string>
+    <string name="import_csv_no_data_found">未能导入任何数据，请检查文件格式</string>
     <string name="import_type_steam_title">Steam Guard</string>
     <string name="import_type_steam_desc">导入 Steam 令牌的 maFile 文件</string>
     <string name="import_type_steam_file_hint">选择 .maFile 文件</string>
