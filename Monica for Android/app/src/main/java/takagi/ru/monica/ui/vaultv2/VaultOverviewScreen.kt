@@ -371,10 +371,18 @@ private fun OverviewFolderRow(folder: VaultOverviewFolder, sources: Map<String, 
 
 @Composable
 private fun OverviewSourceRow(source: VaultOverviewSource, count: Int?, selected: Boolean, onClick: () -> Unit) {
+    val sourceIcon = when (source.key.substringBefore(':')) {
+        "all" -> Icons.Default.List
+        "local" -> Icons.Default.Smartphone
+        "keepass" -> Icons.Default.Key
+        "mdbx" -> Icons.Default.Storage
+        "bitwarden" -> Icons.Default.CloudSync
+        else -> Icons.Default.Storage
+    }
     Surface(shape = RoundedCornerShape(16.dp), color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
         ListItem(headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = { Text(source.provider, style = MaterialTheme.typography.bodySmall) },
-            leadingContent = { Icon(if (source.locked) Icons.Default.Lock else Icons.Default.Storage, null) },
+            leadingContent = { Icon(sourceIcon, null) },
             trailingContent = {
                 if (source.locked) Text(stringResource(R.string.vault_overview_locked), style = MaterialTheme.typography.labelSmall)
                 else if (selected) Icon(Icons.Default.Check, null)
