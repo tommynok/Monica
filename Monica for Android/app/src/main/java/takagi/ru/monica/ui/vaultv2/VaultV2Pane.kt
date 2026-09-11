@@ -74,6 +74,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -3188,9 +3189,15 @@ fun VaultV2Pane(
 		stringResource(R.string.no_results)
 	}
 
+	val pageMotion = rememberVaultOverviewPageMotion(
+		showOverview = showOverview,
+		enabled = appSettings.vaultOverviewEnabled && !appSettings.reduceAnimations,
+	)
 	Box(
 		modifier = modifier
 			.fillMaxSize()
+			.clipToBounds()
+			.then(pageMotion)
 	) {
 		if (showOverview) {
 			VaultOverviewContent(
