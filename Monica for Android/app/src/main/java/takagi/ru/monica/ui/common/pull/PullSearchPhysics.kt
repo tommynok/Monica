@@ -6,6 +6,17 @@ import kotlin.math.sqrt
 private const val MIN_PULL_RESISTANCE = 0.12f
 private const val MAX_PULL_RESISTANCE = 0.46f
 
+// Keep the existing pull curve, with slightly more resistance for search gestures.
+internal fun calculateSearchPullOffset(
+    currentOffset: Float,
+    dragDelta: Float,
+    maxDragDistance: Float
+): Float = calculateDampedPullOffset(
+    currentOffset = currentOffset,
+    dragDelta = dragDelta * 0.9f,
+    maxDragDistance = maxDragDistance
+)
+
 fun calculateDampedPullOffset(
     currentOffset: Float,
     dragDelta: Float,

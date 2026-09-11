@@ -8,7 +8,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -45,20 +44,17 @@ fun rememberPullToSearchState(
     var currentOffset by remember { mutableFloatStateOf(0f) }
     val searchExpandedState by rememberUpdatedState(isSearchExpanded)
     val collapseAnimatable = remember { Animatable(0f) }
-    val hold = remember(scope) {
-        PullSearchHoldState(
-            scope = scope,
+    val gesture = remember {
+        PullSearchGestureState(
             canTriggerSearch = { !searchExpandedState },
-            onSearchTriggered = {
-                haptic.performPullThreshold()
-                onSearchTriggeredState()
-            },
+            onSearchThresholdReached = { haptic.performPullThreshold() },
+            onSearchTriggered = { onSearchTriggeredState() },
         )
     }
 
     fun updateOffset(newOffset: Float) {
         currentOffset = newOffset
-        hold.updatePull(currentOffset >= searchTriggerDistance)
+        gesture.updatePull(currentOffset >= searchTriggerDistance)
     }
 
     fun interruptCollapseAnimation() {
@@ -92,13 +88,11 @@ fun rememberPullToSearchState(
         }
     }
 
-    fun endGesture() {
-        hold.endGesture()
-    }
-
     fun onVerticalDrag(dragAmount: Float) {
         if (searchExpandedState) return
-        hold.onScroll()
+        // Empty content can use the drag callbacks without a nested scroll modifier.
+        if (!gesture.isGestureActive) gesture.beginGesture()
+        if (!gesture.canPull) return
         interruptCollapseAnimation()
         if (dragAmount < 0f) {
             updateOffset((currentOffset + dragAmount).coerceAtLeast(0f))
@@ -106,7 +100,7 @@ fun rememberPullToSearchState(
         }
         if (dragAmount == 0f) return
         updateOffset(
-            calculateDampedPullOffset(
+            calculateSearchPullOffset(
                 currentOffset = currentOffset,
                 dragDelta = dragAmount,
                 maxDragDistance = maxDragDistance
@@ -115,19 +109,19 @@ fun rememberPullToSearchState(
     }
 
     val onDragEnd: () -> Unit = {
-        endGesture()
+        gesture.releaseSearch()
         scope.launch {
             collapsePullOffsetSmoothly()
         }
     }
     val onDragCancel: () -> Unit = {
-        endGesture()
+        gesture.cancelGesture()
         scope.launch { collapsePullOffsetSmoothly() }
     }
 
     LaunchedEffect(isSearchExpanded) {
         if (isSearchExpanded) {
-            hold.cancelHold()
+            gesture.cancelGesture()
             collapsePullOffsetSmoothly()
         }
     }
@@ -135,7 +129,6 @@ fun rememberPullToSearchState(
     val nestedScrollConnection = remember(searchTriggerDistance, maxDragDistance) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput && !searchExpandedState) hold.onScroll()
                 if (currentOffset > 0f && available.y < 0f) {
                     interruptCollapseAnimation()
                     val newOffset = (currentOffset + available.y).coerceAtLeast(0f)
@@ -152,14 +145,14 @@ fun rememberPullToSearchState(
                 source: NestedScrollSource
             ): Offset {
                 if (source != NestedScrollSource.UserInput || searchExpandedState) return Offset.Zero
-                hold.onScroll(contentConsumed = consumed.y != 0f)
+                gesture.onScroll(contentConsumed = consumed.y != 0f)
                 if (
                     available.y > 0f &&
-                    hold.canPull
+                    gesture.canPull
                 ) {
                     interruptCollapseAnimation()
                     updateOffset(
-                        calculateDampedPullOffset(
+                        calculateSearchPullOffset(
                             currentOffset = currentOffset,
                             dragDelta = available.y,
                             maxDragDistance = maxDragDistance
@@ -171,13 +164,13 @@ fun rememberPullToSearchState(
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                endGesture()
+                gesture.releaseSearch()
                 collapsePullOffsetSmoothly()
                 return Velocity.Zero
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (!hold.isGestureActive && currentOffset > 0f) {
+                if (!gesture.isGestureActive && currentOffset > 0f) {
                     collapsePullOffsetSmoothly()
                 }
                 return Velocity.Zero
@@ -188,7 +181,7 @@ fun rememberPullToSearchState(
     return PullToSearchStateHandle(
         currentOffset = currentOffset,
         nestedScrollConnection = nestedScrollConnection,
-        gestureModifier = Modifier.observePullSearchGesture(hold).nestedScroll(nestedScrollConnection),
+        gestureModifier = Modifier.observePullSearchGesture(gesture).nestedScroll(nestedScrollConnection),
         onVerticalDrag = ::onVerticalDrag,
         onDragEnd = onDragEnd,
         onDragCancel = onDragCancel

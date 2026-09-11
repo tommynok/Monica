@@ -23,15 +23,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
@@ -111,6 +114,17 @@ class ExpressiveTopBarSearchDismissalTest {
         }
     }
 
+    private fun assertResultsPreserved() {
+        compose.waitUntil(10_000) { !imeVisible }
+        compose.onNode(hasSetTextAction()).assertIsDisplayed()
+        compose.onNodeWithText("Results: visa").assertIsDisplayed()
+        compose.runOnIdle {
+            assertTrue(expanded)
+            assertEquals("visa", query)
+            assertEquals(0, navigations)
+        }
+    }
+
     private fun screenshot(name: String) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val directory = requireNotNull(context.getExternalFilesDir("search-tests"))
@@ -122,9 +136,12 @@ class ExpressiveTopBarSearchDismissalTest {
     }
 
     @Test
-    fun oneSystemBackClosesKeyboardAndSearchAndRestoresActions() {
+    fun firstBackHidesTheKeyboardAndSecondBackExitsSearch() {
         show()
         screenshot("search-open.png")
+        pressSystemBack()
+        assertResultsPreserved()
+        screenshot("search-results-keyboard-hidden.png")
         pressSystemBack()
         assertClosed()
         screenshot("search-closed.png")
@@ -136,21 +153,35 @@ class ExpressiveTopBarSearchDismissalTest {
     fun keyboardSearchKeepsResultsUntilTheNextBack() {
         show()
         compose.onNode(hasSetTextAction()).performImeAction()
-        compose.waitUntil(10_000) { !imeVisible }
-        compose.runOnIdle {
-            assertTrue(expanded)
-            assertEquals("visa", query)
-        }
+        assertResultsPreserved()
         pressSystemBack()
         assertClosed()
     }
 
     @Test
-    fun theCloseButtonUsesTheSameDismissal() {
+    fun theCloseButtonExitsSearchAndHidesTheKeyboardTogether() {
         show()
         val label = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.topbar_close_search)
         compose.onNodeWithContentDescription(label).performClick()
         assertClosed()
+    }
+
+    @Test
+    fun hidingTheKeyboardKeepsResultsAndTappingSearchRestoresInput() {
+        show()
+        compose.runOnUiThread {
+            val window = compose.activity.window
+            WindowCompat.getInsetsController(window, window.decorView).hide(WindowInsetsCompat.Type.ime())
+        }
+        assertResultsPreserved()
+        compose.onNode(hasSetTextAction()).performTouchInput { click() }
+        compose.waitUntil(10_000) { imeVisible }
+        compose.onNode(hasSetTextAction()).assertIsFocused()
+        compose.runOnIdle {
+            assertTrue(expanded)
+            assertEquals("visa", query)
+            assertEquals(0, navigations)
+        }
     }
 
     @Test

@@ -35,8 +35,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -52,7 +50,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import takagi.ru.monica.R
-import androidx.lifecycle.compose.currentStateAsState
 
 internal fun initialSearchTextFieldValue(searchQuery: String): TextFieldValue =
     TextFieldValue(
@@ -93,10 +90,6 @@ fun ExpressiveTopBar(
     val keyboardController = LocalSoftwareKeyboardController.current
     val imeVisible = WindowInsets.isImeVisible
     val windowFocused = LocalWindowInfo.current.isWindowFocused
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
-    var imeWasVisible by remember(isSearchExpanded) { mutableStateOf(false) }
-    var keepSearchAfterImeAction by remember(isSearchExpanded) { mutableStateOf(false) }
     var closeRequested by remember(isSearchExpanded) { mutableStateOf(false) }
 
     fun closeSearch() {
@@ -108,20 +101,12 @@ fun ExpressiveTopBar(
         onSearchExpandedChange(false)
     }
 
-    // IMEs consume Android Back before activity callbacks. Finish the same dismissal when
-    // their window closes; keep explicit keyboard Done/Search actions useful for viewing results.
-    BackHandler(enabled = isSearchExpanded && windowFocused) { closeSearch() }
-    LaunchedEffect(isSearchExpanded, imeVisible, windowFocused, lifecycleState) {
-        if (!isSearchExpanded || !windowFocused ||
-            !lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
-        ) {
-            imeWasVisible = false
-        } else if (imeVisible) {
-            imeWasVisible = true
-        } else if (imeWasVisible) {
-            imeWasVisible = false
-            if (!keepSearchAfterImeAction) closeSearch()
-            keepSearchAfterImeAction = false
+    // Hiding the IME leaves the query and results available. A subsequent Back exits search.
+    BackHandler(enabled = isSearchExpanded && windowFocused) {
+        if (imeVisible) {
+            keyboardController?.hide()
+        } else {
+            closeSearch()
         }
     }
     val searchInteractionSource = remember { MutableInteractionSource() }
@@ -140,7 +125,6 @@ fun ExpressiveTopBar(
     LaunchedEffect(searchInteractionSource, isSearchExpanded) {
         searchInteractionSource.interactions.collect { interaction ->
             if (interaction is PressInteraction.Press) {
-                keepSearchAfterImeAction = false
                 focusRequester.requestFocus()
                 keyboardController?.show()
             }
@@ -285,11 +269,9 @@ fun ExpressiveTopBar(
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                     keyboardActions = KeyboardActions(
                                         onDone = {
-                                            keepSearchAfterImeAction = true
                                             keyboardController?.hide()
                                         },
                                         onSearch = {
-                                            keepSearchAfterImeAction = true
                                             keyboardController?.hide()
                                         },
                                     ),
