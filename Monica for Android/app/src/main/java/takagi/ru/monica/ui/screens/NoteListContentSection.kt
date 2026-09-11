@@ -41,7 +41,7 @@ import takagi.ru.monica.ui.components.PullActionVisualState
 import takagi.ru.monica.ui.common.state.InitialListRenderState
 import takagi.ru.monica.ui.common.state.rememberSaveableLazyListState
 import takagi.ru.monica.ui.common.state.rememberSaveableLazyGridState
-import takagi.ru.monica.ui.common.state.resolveInitialListRenderState
+import takagi.ru.monica.ui.common.state.resolveMergedListRenderState
 import takagi.ru.monica.ui.common.pull.rememberPullActionState
 
 @Composable
@@ -92,7 +92,8 @@ fun NoteListContent(
     } else {
         currentOffset.toInt()
     }
-    val initialRenderState = resolveInitialListRenderState(
+    // Do not display cached notes until their saved scope is ready.
+    val initialRenderState = resolveMergedListRenderState(
         isReady = !isInitialLoading,
         itemCount = notes.size,
     )

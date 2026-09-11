@@ -90,7 +90,7 @@ class DockAndListFirstFramePerformanceGuardTest {
         assertTrue(viewModelSource.contains("val parsedNotesReady"))
         assertTrue(viewModelSource.contains("flowOn(Dispatchers.Default)"))
         assertTrue(screenSource.contains("val parsedNotesState by viewModel.parsedNotesState.collectAsState()"))
-        assertTrue(screenSource.contains("isInitialLoading = !parsedNotesState.isReady"))
+        assertTrue(screenSource.contains("isInitialLoading = !hasRestoredCategoryFilter || !parsedNotesState.isReady"))
         assertFalse(screenSource.contains("filteredNotes.map { it.toNoteListItemUiModel() }"))
         assertTrue(contentSource.contains("isInitialLoading: Boolean"))
         assertTrue(contentSource.contains("InitialListRenderState.Loading"))

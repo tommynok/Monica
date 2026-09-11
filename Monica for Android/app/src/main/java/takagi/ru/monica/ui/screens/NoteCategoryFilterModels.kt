@@ -1,5 +1,6 @@
 package takagi.ru.monica.ui.screens
 
+import androidx.compose.runtime.saveable.mapSaver
 import takagi.ru.monica.utils.SavedCategoryFilterState
 import takagi.ru.monica.viewmodel.NoteDraftStorageTarget
 
@@ -25,6 +26,30 @@ internal sealed interface NoteCategoryFilter {
     data class KeePassDatabaseUncategorized(val databaseId: Long) : NoteCategoryFilter
     data class MdbxDatabase(val databaseId: Long) : NoteCategoryFilter
 }
+
+internal val NoteCategoryFilterSaver = mapSaver<NoteCategoryFilter>(
+    save = { filter ->
+        val state = encodeNoteCategoryFilter(filter)
+        mapOf(
+            "type" to state.type,
+            "primaryId" to state.primaryId,
+            "secondaryId" to state.secondaryId,
+            "text" to state.text,
+            "groupUuid" to state.groupUuid
+        )
+    },
+    restore = { values ->
+        decodeNoteCategoryFilter(
+            SavedCategoryFilterState(
+                type = values["type"] as? String ?: "all",
+                primaryId = values["primaryId"] as? Long,
+                secondaryId = values["secondaryId"] as? Long,
+                text = values["text"] as? String,
+                groupUuid = values["groupUuid"] as? String
+            )
+        )
+    }
+)
 
 internal fun NoteCategoryFilter.bitwardenVaultIdForSync(): Long? = when (this) {
     is NoteCategoryFilter.BitwardenVault -> vaultId

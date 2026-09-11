@@ -217,11 +217,14 @@ fun NoteListScreen(
     val parsedNotes = parsedNotesState.items
     val notes = remember(parsedNotes) { parsedNotes.map { it.item } }
     val parsedNoteById = remember(parsedNotes) { parsedNotes.associateBy { it.item.id } }
-    var selectedCategoryFilter by remember { mutableStateOf<NoteCategoryFilter>(NoteCategoryFilter.All) }
-    val savedCategoryFilterState by settingsManager
-        .categoryFilterStateFlow(SettingsManager.CategoryFilterScope.NOTE)
-        .collectAsState(initial = null)
-    var hasRestoredCategoryFilter by remember { mutableStateOf(false) }
+    // Restore the scope with the tab, before the cached notes can render an All snapshot.
+    var selectedCategoryFilter by rememberSaveable(stateSaver = NoteCategoryFilterSaver) {
+        mutableStateOf<NoteCategoryFilter>(NoteCategoryFilter.All)
+    }
+    val savedCategoryFilterState by remember(settingsManager) {
+        settingsManager.categoryFilterStateFlow(SettingsManager.CategoryFilterScope.NOTE)
+    }.collectAsState(initial = null)
+    var hasRestoredCategoryFilter by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(savedCategoryFilterState, hasRestoredCategoryFilter) {
         if (hasRestoredCategoryFilter) return@LaunchedEffect
@@ -941,7 +944,7 @@ fun NoteListScreen(
         NoteListContent(
             notes = filteredNoteUiItems,
             allNotes = allNoteUiItems,
-            isInitialLoading = !parsedNotesState.isReady,
+            isInitialLoading = !hasRestoredCategoryFilter || !parsedNotesState.isReady,
             isGridLayout = isGridLayout,
             isSearchExpanded = isSearchExpanded,
             onRequestExpandSearch = { isSearchExpanded = true },
