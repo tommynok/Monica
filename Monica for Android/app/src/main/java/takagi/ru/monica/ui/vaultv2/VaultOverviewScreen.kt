@@ -1,6 +1,7 @@
 package takagi.ru.monica.ui.vaultv2
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -165,7 +166,11 @@ internal fun VaultOverviewScreen(
                             )
                         } else Column(Modifier.testTag("overview_${module.name.lowercase()}")) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Row(Modifier.weight(1f).testTag("overview_toggle_${module.name}").clickable(role = Role.Button) {
+                                Row(Modifier.weight(1f).testTag("overview_toggle_${module.name}").clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    role = Role.Button,
+                                ) {
                                     onConfigChange { it.copy(collapsed = if (collapsed) it.collapsed - module.name else it.collapsed + module.name) }
                                 }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Icon(if (collapsed) Icons.Default.ChevronRight else Icons.Default.ExpandMore, null, Modifier.size(18.dp))
