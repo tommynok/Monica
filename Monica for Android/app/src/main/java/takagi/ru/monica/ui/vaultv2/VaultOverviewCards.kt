@@ -5,13 +5,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -97,7 +95,6 @@ internal fun rememberOverviewWalletCards(
 @Composable
 internal fun OverviewCards(
     prepared: VaultOverviewWalletCards?,
-    sources: Map<String, VaultOverviewSource>,
     selectedCardKey: String?,
     listState: LazyListState,
     state: VaultOverviewCardStackState,
@@ -128,11 +125,6 @@ internal fun OverviewCards(
             onCoverBounds = { state.originBounds = it },
             coverVisible = !state.expanded || state.coverRevealed || isDetailVisible && state.hasOpenedDetail,
             controlsVisible = !state.expanded || isDetailVisible && state.hasOpenedDetail,
-        )
-        if (prepared.scope == "all") Text(
-            sources[prepared.itemsById[entry.cover.id]?.overviewSource()]?.name.orEmpty(),
-            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp),
         )
     }
 }

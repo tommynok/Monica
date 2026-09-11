@@ -212,7 +212,7 @@ internal fun VaultOverviewScreen(
                             }
                             if (!collapsed) when (module) {
                                 VaultOverviewModule.CARDS -> if (snapshot.cards.isEmpty()) OverviewEmpty(R.string.vault_overview_empty_cards)
-                                    else OverviewCards(walletCards, sourceByKey, selectedCardKey, listState,
+                                    else OverviewCards(walletCards, selectedCardKey, listState,
                                         cardStackState, isDetailVisible, onManage = { pinModule = VaultOverviewModule.CARDS.name })
                                 VaultOverviewModule.ITEMS, VaultOverviewModule.FAVORITES -> {
                                     val rows = if (module == VaultOverviewModule.ITEMS) snapshot.frequentItems else snapshot.favorites
@@ -223,7 +223,6 @@ internal fun VaultOverviewScreen(
                                             key(row.key) {
                                                 OverviewItemRow(
                                                     item = row,
-                                                    source = sourceByKey[row.overviewSource()]?.name.takeIf { currentScope == "all" },
                                                     shape = GroupedItemDefaults.shape(index, preview.size),
                                                     onClick = { onOpenItem(row) },
                                                 )
@@ -296,7 +295,7 @@ internal fun VaultOverviewScreen(
 }
 
 @Composable
-private fun OverviewItemRow(item: VaultV2Item, source: String?, shape: Shape, onClick: () -> Unit) {
+private fun OverviewItemRow(item: VaultV2Item, shape: Shape, onClick: () -> Unit) {
     ListItem(headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(item.subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingContent = {
@@ -313,7 +312,6 @@ private fun OverviewItemRow(item: VaultV2Item, source: String?, shape: Shape, on
                 Icon(item.type.icon(), null, tint = MaterialTheme.colorScheme.primary)
             }
         },
-        trailingContent = { if (source != null) Text(source, style = MaterialTheme.typography.labelSmall, maxLines = 1) },
         modifier = Modifier.clip(shape).clickable(role = Role.Button, onClick = onClick).testTag("overview_item_${item.key}"),
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
 }
