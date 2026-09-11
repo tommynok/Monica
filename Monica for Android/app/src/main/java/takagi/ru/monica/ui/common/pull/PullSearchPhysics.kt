@@ -13,7 +13,7 @@ internal fun calculateSearchPullOffset(
     maxDragDistance: Float
 ): Float = calculateDampedPullOffset(
     currentOffset = currentOffset,
-    dragDelta = dragDelta * 0.75f,
+    dragDelta = dragDelta * 0.9f,
     maxDragDistance = maxDragDistance
 )
 

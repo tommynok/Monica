@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import takagi.ru.monica.R
 
 object PullSearchDefaults {
-    val TriggerDistance = 72.dp
+    val TriggerDistance = 64.dp
 }
 
 /** Draw only in the space exposed above the translated content, never over list rows. */
