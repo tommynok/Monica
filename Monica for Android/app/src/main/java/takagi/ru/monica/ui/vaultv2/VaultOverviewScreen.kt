@@ -29,6 +29,7 @@ import takagi.ru.monica.R
 import takagi.ru.monica.data.VaultOverviewConfig
 import takagi.ru.monica.data.VaultOverviewModule
 import takagi.ru.monica.security.SecurityManager
+import takagi.ru.monica.ui.components.ExpressiveTopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,22 +79,30 @@ internal fun VaultOverviewScreen(
         if (!cardsVisible || selectedSource?.locked == true) cardStackState.clear()
     }
     Column(modifier.fillMaxSize().testTag("vault_overview_screen")) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.vault_overview_title), Modifier.weight(1f),
-                style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            IconButton(onClick = onSearch, modifier = Modifier.testTag("overview_search")) {
-                Icon(Icons.Default.Search, stringResource(R.string.search))
-            }
-            FilledTonalIconButton(onClick = { showCustomization = true }, modifier = Modifier.testTag("overview_customize")) {
-                Icon(Icons.Default.Tune, stringResource(R.string.vault_overview_customize))
-            }
-        }
+        ExpressiveTopBar(
+            title = stringResource(R.string.vault_overview_title),
+            // Search belongs to the existing vault list, including its query and Back handling.
+            searchQuery = "",
+            onSearchQueryChange = {},
+            isSearchExpanded = false,
+            onSearchExpandedChange = { expanded -> if (expanded) onSearch() },
+            collapsedTitleEndPadding = 128.dp,
+            modifier = Modifier.testTag("overview_top_bar"),
+            actions = {
+                IconButton(onClick = onSearch, modifier = Modifier.testTag("overview_search")) {
+                    Icon(Icons.Default.Search, stringResource(R.string.search))
+                }
+                IconButton(onClick = { showCustomization = true }, modifier = Modifier.testTag("overview_customize")) {
+                    Icon(Icons.Default.Tune, stringResource(R.string.vault_overview_customize))
+                }
+            },
+        )
         AssistChip(
             onClick = { showSources = true },
             label = { Text(scopeName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             leadingIcon = { Icon(if (selectedSource?.locked == true) Icons.Default.Lock else Icons.Default.Storage, null, Modifier.size(16.dp)) },
             trailingIcon = { Icon(Icons.Default.ExpandMore, null, Modifier.size(16.dp)) },
-            modifier = Modifier.padding(start = 20.dp, bottom = 6.dp).testTag("overview_scope"),
+            modifier = Modifier.padding(start = 24.dp, bottom = 6.dp).testTag("overview_scope"),
         )
         if (selectedSource?.locked == true) {
             Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {

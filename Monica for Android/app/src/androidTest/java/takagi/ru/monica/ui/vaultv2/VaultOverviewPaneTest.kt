@@ -22,6 +22,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import takagi.ru.monica.R
 import takagi.ru.monica.data.*
 import takagi.ru.monica.repository.*
 import takagi.ru.monica.security.SecurityManager
@@ -136,5 +137,29 @@ class VaultOverviewPaneTest {
         compose.onNodeWithTag("vault_overview_screen").assertDoesNotExist()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Overview password 1").fetchSemanticsNodes().isNotEmpty() }
         compose.runOnIdle { assertFalse(state.overviewListOpen); assertNull(state.overviewItemType) }
+    }
+
+    @Test fun sharedTopBarSearchKeepsResultsAfterImeActionAndRestoresTheOverview() {
+        showPane()
+        compose.onNodeWithTag("overview_modules").performScrollToNode(hasTestTag("overview_archive"))
+        var position = 0 to 0
+        compose.runOnIdle { position = state.overviewScrollIndex to state.overviewScrollOffset }
+        compose.onNodeWithTag("overview_search").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("password 24")
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText("Overview password 24").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(hasSetTextAction()).performImeAction()
+        compose.onNode(hasSetTextAction()).assertTextEquals("password 24")
+        compose.onNodeWithText("Overview password 24").performClick()
+        compose.runOnIdle { assertTrue(state.overviewListOpen); assertEquals(24L, openedPassword) }
+        compose.onNodeWithContentDescription(context.getString(R.string.topbar_close_search)).performClick()
+        compose.onNodeWithTag("overview_top_bar").assertIsDisplayed()
+        compose.onNodeWithTag("overview_customize").assertIsDisplayed()
+        compose.runOnIdle {
+            assertFalse(state.overviewListOpen)
+            assertEquals("local", state.storageFilterType)
+            assertEquals(position, state.overviewScrollIndex to state.overviewScrollOffset)
+        }
     }
 }

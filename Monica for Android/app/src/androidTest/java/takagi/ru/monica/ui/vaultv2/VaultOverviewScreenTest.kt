@@ -200,6 +200,14 @@ class VaultOverviewScreenTest {
         compose.onNodeWithText(context.getString(R.string.vault_overview_unlock)).assertIsDisplayed()
     }
 
+    @Test fun theSharedActionPillSwipeOpensSearchInTheCurrentDatabase() {
+        showOverview()
+        compose.onNodeWithTag("overview_scope").performClick()
+        compose.onNodeWithTag("overview_source_bitwarden:2").performClick()
+        compose.onNodeWithTag("overview_customize").performTouchInput { swipeLeft() }
+        compose.runOnIdle { assertEquals("search:bitwarden:2", route) }
+    }
+
     @Test fun capturesTheNativeOverview() {
         showOverview()
         compose.waitUntil(5000) { cardStack.prepared?.cards?.size == 2 }
