@@ -297,7 +297,16 @@ class BitwardenRepository(private val context: Context) {
                 encKey = wrappingKey.encKey.copyOf(),
                 macKey = wrappingKey.macKey.copyOf()
             ),
-            isOnline = isOnline
+            isOnline = isOnline,
+            wrappingKeyProvider = {
+                withContext(Dispatchers.IO) {
+                    val currentToken = accessTokenCache[vault.id] ?: throw takagi.ru.monica.attachments.model.AttachmentError.BitwardenLocked
+                    val currentKey = symmetricKeyCache[vault.id] ?: throw takagi.ru.monica.attachments.model.AttachmentError.BitwardenLocked
+                    takagi.ru.monica.bitwarden.service.BitwardenAttachmentKeyResolver.resolve(
+                        vaultApi, currentToken, cipherId, currentKey
+                    )
+                }
+            }
         )
     }
 
@@ -322,11 +331,7 @@ class BitwardenRepository(private val context: Context) {
         }.getOrNull() ?: return@withContext null
         if (!response.isSuccessful) return@withContext null
         val cipher = response.body() ?: return@withContext null
-        val effectiveKey = BitwardenCipherKeyResolver.resolveCipherKey(
-            cipher = cipher,
-            vaultKey = vaultKey,
-            logTag = TAG
-        )
+        val effectiveKey = takagi.ru.monica.bitwarden.service.BitwardenAttachmentKeyResolver.resolve(cipher, vaultKey)
         try {
             AttachmentCipherSnapshot(
                 context = takagi.ru.monica.attachments.facade.AttachmentFacade.BitwardenContext(
