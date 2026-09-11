@@ -34,7 +34,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowRight
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Badge
@@ -3248,11 +3247,6 @@ fun VaultV2Pane(
 					state.overviewFavorites -> stringResource(R.string.vault_overview_favorites)
 					else -> topBarTitle
 				},
-				navigationIcon = if (appSettings.vaultOverviewEnabled) ({
-					IconButton(onClick = ::closeOverviewList) {
-						Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.vault_overview_return))
-					}
-				}) else null,
 				searchQuery = searchQuery,
 				onSearchQueryChange = { searchQuery = it },
 				isSearchExpanded = isSearchExpanded,
