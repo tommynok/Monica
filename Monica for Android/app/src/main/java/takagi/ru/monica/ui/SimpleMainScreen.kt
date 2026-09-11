@@ -107,6 +107,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import takagi.ru.monica.R
+import takagi.ru.monica.ui.cardwallet.WalletStackOverlayHost
 import takagi.ru.monica.data.AddButtonBehaviorMode
 import takagi.ru.monica.data.AppSettings
 import takagi.ru.monica.data.AddButtonMenuAction
@@ -3312,7 +3313,9 @@ fun SimpleMainScreen(
     } // End Outer Box
     }
 
-    RenderMainSurface()
+    WalletStackOverlayHost {
+        RenderMainSurface()
+    }
 
     if (pendingPasskeyDelete != null) {
         val passkey = pendingPasskeyDelete!!

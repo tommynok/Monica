@@ -76,33 +76,35 @@ class WalletStackBrowserTest {
         var origin by mutableStateOf<Rect?>(null)
         compose.setContent {
             MaterialTheme {
-                Column(Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) {
-                    Text("Wallet underneath", Modifier.padding(bottom = 32.dp), style = MaterialTheme.typography.headlineMedium)
-                    WalletStackCard(
-                        entry = entry.copy(stack = entry.stack.copy(coverId = coverId)),
-                        onClick = { visible = true; animateEntrance = true; coverRevealed = false },
-                        onLongClick = {}, onManage = { managementRequests.incrementAndGet() },
-                        onCoverBounds = { origin = it },
-                        coverVisible = !visible || coverRevealed || detailId != null,
-                        controlsVisible = !visible || detailId != null
-                    )
-                }
-                if (detailId != null) {
-                    Button(onClick = { detailId = null }) { Text("Return from card $detailId") }
-                } else if (visible) {
-                    WalletStackBrowser(
-                        entry = entry,
-                        originBounds = origin,
-                        initialCardId = focused.get(),
-                        animateEntrance = animateEntrance,
-                        onOpened = { animateEntrance = false },
-                        onFocusedCardChanged = { focused.set(it) },
-                        onCollapseStart = { collapsedCover.set(it); coverId = it },
-                        onRevealCover = { coverRevealed = true; reveals.incrementAndGet() },
-                        onDismiss = { dismissals.incrementAndGet(); visible = false },
-                        onOpenCard = { detailId = it.id },
-                        onManage = {}
-                    )
+                WalletStackOverlayHost {
+                    Column(Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) {
+                        Text("Wallet underneath", Modifier.padding(bottom = 32.dp), style = MaterialTheme.typography.headlineMedium)
+                        WalletStackCard(
+                            entry = entry.copy(stack = entry.stack.copy(coverId = coverId)),
+                            onClick = { visible = true; animateEntrance = true; coverRevealed = false },
+                            onLongClick = {}, onManage = { managementRequests.incrementAndGet() },
+                            onCoverBounds = { origin = it },
+                            coverVisible = !visible || coverRevealed || detailId != null,
+                            controlsVisible = !visible || detailId != null
+                        )
+                    }
+                    if (detailId != null) {
+                        Button(onClick = { detailId = null }) { Text("Return from card $detailId") }
+                    } else if (visible) {
+                        WalletStackBrowser(
+                            entry = entry,
+                            originBounds = origin,
+                            initialCardId = focused.get(),
+                            animateEntrance = animateEntrance,
+                            onOpened = { animateEntrance = false },
+                            onFocusedCardChanged = { focused.set(it) },
+                            onCollapseStart = { collapsedCover.set(it); coverId = it },
+                            onRevealCover = { coverRevealed = true; reveals.incrementAndGet() },
+                            onDismiss = { dismissals.incrementAndGet(); visible = false },
+                            onOpenCard = { detailId = it.id },
+                            onManage = {}
+                        )
+                    }
                 }
             }
         }
@@ -204,7 +206,7 @@ class WalletStackBrowserTest {
         assertEquals(0, dismissals.get())
     }
 
-    @Test fun collapseHandsOffTheSameCardBeforeRemovingTheAnimationWindow() {
+    @Test fun collapseHandsOffTheSameCardBeforeRemovingTheOverlay() {
         showBrowser(enterAnimated = true)
         compose.waitForIdle()
         compose.onNodeWithTag("wallet_stack_scroll").performTouchInput { swipeUp(durationMillis = 600) }
@@ -240,7 +242,7 @@ class WalletStackBrowserTest {
         assertEquals(finalFrame!!.height, coverFrame.height)
         val controlsBounds = compose.onNodeWithTag("wallet_stack_controls", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInWindow.translate(-coverBounds.topLeft).inflate(1f)
-        // Compare the actual card interior across the window handoff, excluding the outer
+        // Compare the actual card interior across the overlay handoff, excluding the outer
         // shadow/rounded corners and controls, which fade in separately at their list size.
         var difference = 0L
         var channels = 0L

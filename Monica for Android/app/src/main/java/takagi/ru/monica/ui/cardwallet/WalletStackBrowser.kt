@@ -1,5 +1,7 @@
 package takagi.ru.monica.ui.cardwallet
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
@@ -67,7 +69,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -81,9 +82,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.zIndex
 import kotlin.math.abs
 import kotlin.math.floor
@@ -91,9 +89,10 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import takagi.ru.monica.R
+import takagi.ru.monica.ui.LocalAnimatedVisibilityScope
 import takagi.ru.monica.ui.components.BankCardShape
 
-/** A modal wallet layer keeps card scrolling independent from the list's pull/swipe actions. */
+/** A scene overlay keeps card scrolling independent from the list's pull/swipe actions. */
 @Composable
 internal fun WalletStackBrowser(
     entry: WalletStackListEntry.Stack,
@@ -110,6 +109,10 @@ internal fun WalletStackBrowser(
 ) {
     val cards = entry.cards
     if (cards.isEmpty()) return
+    val navigation = LocalAnimatedVisibilityScope.current?.transition
+    val handlesBack = navigation == null || navigation.targetState == EnterExitState.Visible
+    val isNavigationActive = handlesBack &&
+        (navigation == null || navigation.currentState == EnterExitState.Visible)
     val scope = rememberCoroutineScope()
     var position by rememberSaveable(entry.stack.id) {
         mutableFloatStateOf(cards.indexOfFirst { it.id == initialCardId }.coerceAtLeast(0).toFloat())
@@ -133,7 +136,7 @@ internal fun WalletStackBrowser(
     val latestOnRevealCover by rememberUpdatedState(onRevealCover)
     val latestOnDismiss by rememberUpdatedState(onDismiss)
     val scroll = rememberScrollableState { delta ->
-        if (closing) return@rememberScrollableState 0f
+        if (closing || !isNavigationActive) return@rememberScrollableState 0f
         val old = position
         val pullingPastEnd = old <= 0f && delta > 0f || old >= cards.lastIndex && delta < 0f
         val overpull = abs(old - old.coerceIn(0f, cards.lastIndex.toFloat()))
@@ -161,7 +164,7 @@ internal fun WalletStackBrowser(
         }
     }
     fun moveFocusBy(offset: Int): Boolean {
-        if (closing) return false
+        if (closing || !isNavigationActive) return false
         scope.launch {
             scroll.scroll {
                 val target = (focusIndex + offset).coerceIn(0, cards.lastIndex).toFloat()
@@ -171,7 +174,7 @@ internal fun WalletStackBrowser(
         return true
     }
     val requestCollapse: () -> Unit = {
-        if (!closing) {
+        if (!closing && isNavigationActive) {
             closingIndex = focusIndex
             closing = true
             latestOnCollapse(cards[focusIndex].id)
@@ -179,7 +182,7 @@ internal fun WalletStackBrowser(
                 scroll.stopScroll(MutatePriority.PreventUserInput)
                 expansion.animateTo(0f, tween(360, easing = FastOutSlowInEasing))
                 // Paint the real cover underneath the matching final animation frame before
-                // removing the dialog window. This avoids an empty or stale-cover frame.
+                // removing the overlay. This avoids an empty or stale-cover frame.
                 latestOnRevealCover()
                 repeat(2) { withFrameNanos { } }
                 latestOnDismiss()
@@ -198,21 +201,9 @@ internal fun WalletStackBrowser(
     val stackName = stringResource(R.string.wallet_stack_default_name)
     val nextLabel = stringResource(R.string.wallet_stack_next)
     val previousLabel = stringResource(R.string.wallet_stack_previous)
-    Dialog(
-        onDismissRequest = requestCollapse,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-            dismissOnClickOutside = false
-        )
-    ) {
-        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
-        SideEffect {
-            window?.let {
-                if (it.attributes.dimAmount != 0f) it.setDimAmount(0f)
-                if (it.attributes.windowAnimations != 0) it.setWindowAnimations(0)
-            }
-        }
+    WalletStackOverlay {
+        // Keep early return/back presses inside the stack until its page is interactive.
+        BackHandler(enabled = handlesBack, onBack = requestCollapse)
         val background = MaterialTheme.colorScheme.surface
         val density = LocalDensity.current
         val safeInsets = WindowInsets.safeDrawing.asPaddingValues()
@@ -247,7 +238,7 @@ internal fun WalletStackBrowser(
             Box(
                 Modifier.fillMaxSize().testTag("wallet_stack_scroll")
                     .scrollable(scroll, Orientation.Vertical, flingBehavior = fling,
-                        enabled = !closing && expansion.value > 0.95f)
+                        enabled = isNavigationActive && !closing && expansion.value > 0.95f)
                     .semantics {
                         verticalScrollAxisRange = ScrollAxisRange({ position }, { cards.lastIndex.toFloat() })
                         customActions = listOf(
@@ -280,7 +271,7 @@ internal fun WalletStackBrowser(
                                     alpha = if (index == anchorIndex) 1f else spread
                                 }
                                 .testTag("wallet_stack_card_${card.id}")
-                                .clickable(enabled = !closing && expansion.value > 0.95f) {
+                                .clickable(enabled = isNavigationActive && !closing && expansion.value > 0.95f) {
                                     scope.launch {
                                         scroll.stopScroll(MutatePriority.PreventUserInput)
                                         position = index.toFloat()
@@ -336,7 +327,7 @@ internal fun WalletStackBrowser(
                     Text(stringResource(R.string.wallet_stack_browse_hint), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = onManage, enabled = !closing) {
+                IconButton(onClick = { if (isNavigationActive) onManage() }, enabled = !closing) {
                     Icon(Icons.Default.MoreVert, stringResource(R.string.wallet_stack_manage))
                 }
             }

@@ -101,6 +101,7 @@ import takagi.ru.monica.ui.cardwallet.WalletSelectionCardFrame
 import takagi.ru.monica.ui.cardwallet.WalletSelectionSectionHeader
 import takagi.ru.monica.ui.cardwallet.rememberWalletSelectionScrollAnchor
 import takagi.ru.monica.ui.cardwallet.rememberWalletStackEntries
+import takagi.ru.monica.ui.cardwallet.rememberWalletStackPreview
 import takagi.ru.monica.ui.cardwallet.reorderWalletSingleCards
 import takagi.ru.monica.ui.cardwallet.toggleWalletSelectionGroup
 import takagi.ru.monica.data.isKeePassOwned
@@ -718,13 +719,20 @@ fun CardWalletScreen(
             }
         }
     }
-    val expandedStack = remember(expandedStackId, walletStacks, filteredItems) {
+    val currentExpandedStack = remember(expandedStackId, walletStacks, filteredItems) {
         walletStacks?.firstOrNull { it.id == expandedStackId }?.let { stack ->
             val cardsById = filteredItems.associateBy(WalletListItem::id)
             val members = stack.memberIds.mapNotNull(cardsById::get)
             if (members.size >= 2) WalletStackListEntry.Stack(stack, members) else null
         }
     }
+    val expandedStackPreview = rememberWalletStackPreview(
+        stackId = expandedStackId,
+        entry = currentExpandedStack,
+        originBounds = expandedStackId?.let { stackCoverBounds[it] },
+        isReady = filteredState.isReady && walletStacks != null
+    )
+    val expandedStack = expandedStackPreview?.entry
     LaunchedEffect(expandedStackId, expandedStack, filteredState.isReady, walletStacks != null) {
         if (filteredState.isReady && walletStacks != null && expandedStack == null) expandedStackId = null
     }
@@ -1406,7 +1414,7 @@ fun CardWalletScreen(
     if (expandedStack != null && !(isWalletDetailVisible && hasOpenedStackDetail)) {
         WalletStackBrowser(
             entry = expandedStack,
-            originBounds = stackCoverBounds[expandedStack.stack.id],
+            originBounds = expandedStackPreview?.originBounds,
             initialCardId = focusedStackCardId ?: expandedStack.cover.id,
             animateEntrance = animateStackEntrance,
             onOpened = { animateStackEntrance = false },
