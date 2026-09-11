@@ -69,6 +69,8 @@ Monica embraces **Material Design 3** (Material You) to offer a visually stunnin
 *   **Smooth Animations**: Fluid transitions powered by Jetpack Compose.
 *   **Icon Support**: Visual icons for password cards for easier recognition.
 
+The vault scrollbar style is inspired by [PixelPlayer](https://github.com/PixelPlayerHQ/PixelPlayer).
+
 ---
 
 ## 🔒 Security Architecture

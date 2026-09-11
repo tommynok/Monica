@@ -167,6 +167,7 @@ Your support mainly funds:
 Monica's design, compatibility work, and several feature directions have been inspired and supported by the following excellent open-source projects and software:
 
 - [Keyguard](https://github.com/AChep/keyguard-app) - reference for Android password manager interaction design and UX.
+- [PixelPlayer](https://github.com/PixelPlayerHQ/PixelPlayer) - inspiration for the Android vault scrollbar style.
 - [Bitwarden](https://bitwarden.com/) - an important reference for the open-source password management ecosystem, vault model, and sync capabilities.
 - [KeePass](https://keepass.info/) - a foundational influence for the local vault philosophy and `.kdbx` ecosystem compatibility.
 - [Stratum Auth](https://github.com/stratumauth/app) - reference for authenticator experience, icon resources, and related compatibility support.

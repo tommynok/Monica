@@ -167,6 +167,7 @@ Monica が役に立った場合は、継続開発とセキュリティ強化へ�
 Monica の設計、互換性対応、そして一部の機能方針は、以下の優れたオープンソースプロジェクトやソフトウェアから多くの着想と支援を受けています。
 
 - [Keyguard](https://github.com/AChep/keyguard-app) - Android 向けパスワードマネージャーの操作設計と UX の参考。
+- [PixelPlayer](https://github.com/PixelPlayerHQ/PixelPlayer) - Android 版のパスワード保管庫のスクロールバースタイルの参考。
 - [Bitwarden](https://bitwarden.com/) - オープンソースのパスワード管理エコシステム、Vault モデル、同期機能における重要な参考。
 - [KeePass](https://keepass.info/) - ローカル Vault という思想と `.kdbx` エコシステム互換性の基盤。
 - [Stratum Auth](https://github.com/stratumauth/app) - 認証アプリ体験、アイコン資産、関連互換対応の参考。

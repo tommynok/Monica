@@ -167,6 +167,7 @@ Android:
 Дизайн Monica, адаптация совместимости и ряд функциональных направлений вдохновлены и поддержаны следующими открытыми проектами и программами:
 
 - [Keyguard](https://github.com/AChep/keyguard-app) — референс по взаимодействию и UX Android‑менеджера паролей.
+- [PixelPlayer](https://github.com/PixelPlayerHQ/PixelPlayer) — образец оформления полосы прокрутки хранилища паролей в Android‑версии.
 - [Bitwarden](https://bitwarden.com/) — важный ориентир по open-source экосистеме управления паролями, модели vault и синхронизации.
 - [KeePass](https://keepass.info/) — основа философии локального хранилища и совместимости с `.kdbx`.
 - [Stratum Auth](https://github.com/stratumauth/app) — референс по опыту аутентификатора, иконкам и связанным аспектам совместимости.

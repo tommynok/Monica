@@ -190,6 +190,7 @@ Android 小猫这样做喵：
 Monica 的设计、兼容性适配与部分功能方向，受到了这些优秀开源项目和软件的启发喵：
 
 - [Keyguard](https://github.com/AChep/keyguard-app) - Android 端密码管理器的交互设计与体验参考喵。
+- [PixelPlayer](https://github.com/PixelPlayerHQ/PixelPlayer) - Android 端密码库滚动条样式参考喵。
 - [Bitwarden](https://bitwarden.com/) - 开源密码管理生态、Vault 模型与同步能力的重要参考喵。
 - [KeePass](https://keepass.info/) - 本地密码库理念与 `.kdbx` 生态兼容的重要基础喵。
 - [Stratum Auth](https://github.com/stratumauth/app) - 身份验证器体验、图标资源与相关兼容支持参考喵。

@@ -331,6 +331,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 特别感谢:
 - [Keyguard](https://github.com/AChep/keyguard-app) - 在 Android 端密码管理器设计与体验上提供了很多启发
+- [PixelPlayer](https://github.com/PixelPlayerHQ/PixelPlayer) - 密码库滚动条样式参考
 - [Bitwarden](https://bitwarden.com/) - 开源密码管理生态与 Vault/同步能力参考
 - [KeePass](https://keepass.info/) - 本地密码库与跨平台密码管理理念的重要来源
 - [Stratum](https://github.com/stratumauthapp/stratum) - 身份验证器与相关导入/兼容能力的参考项目

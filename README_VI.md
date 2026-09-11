@@ -167,6 +167,7 @@ Nguon ung ho duoc uu tien cho:
 Thiet ke, kha nang tuong thich va mot so dinh huong tinh nang cua Monica da nhan duoc nhieu cam hung va ho tro tu cac du an ma nguon mo va phan mem xuat sac sau:
 
 - [Keyguard](https://github.com/AChep/keyguard-app) - tai lieu tham khao cho thiet ke tuong tac va trai nghiem nguoi dung cua trinh quan ly mat khau Android.
+- [PixelPlayer](https://github.com/PixelPlayerHQ/PixelPlayer) - tham khao cho kieu thanh cuon kho mat khau tren Android.
 - [Bitwarden](https://bitwarden.com/) - nguon tham khao quan trong cho he sinh thai quan ly mat khau ma nguon mo, mo hinh vault va kha nang dong bo.
 - [KeePass](https://keepass.info/) - nen tang cho triet ly local vault va kha nang tuong thich voi he sinh thai `.kdbx`.
 - [Stratum Auth](https://github.com/stratumauth/app) - tham khao ve trai nghiem authenticator, tai nguyen icon va cac ho tro tuong thich lien quan.
