@@ -453,7 +453,7 @@ class BitwardenViewModel(application: Application) : AndroidViewModel(applicatio
                     _events.emit(BitwardenEvent.ShowSuccess("邮箱验证码已发送，请检查收件箱和垃圾邮件"))
                 },
                 onFailure = { error ->
-                    _events.emit(BitwardenEvent.ShowError("发送邮箱验证码失败：${error.message ?: "未知错误"}"))
+                    _events.emit(BitwardenEvent.ShowError("发送邮箱验证码失败：${repository.describeLoginError(error)}"))
                 }
             )
         }
