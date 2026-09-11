@@ -1328,12 +1328,13 @@ fun CardWalletScreen(
                                             Modifier
                                         }
                                         val cardModifier = Modifier
-                                            .padding(bottom = 8.dp)
                                             .graphicsLayer {
                                                 shadowElevation = elevation.toPx()
                                             }
                                             .then(dragModifier)
 
+                                        // Keep row spacing outside the swipe surface so its background
+                                        // cannot show below the card face as an extra stacked layer.
                                         SwipeActions(
                                             onSwipeLeft = { itemToDelete = item },
                                             onSwipeRight = toggleSelection,
@@ -1342,7 +1343,7 @@ fun CardWalletScreen(
                                             allowSwipeLeft = !isSelectionMode,
                                             allowSwipeRight = true,
                                             cardShape = if (walletItem.type == WalletListItemType.BANK_CARD) takagi.ru.monica.ui.components.BankCardShape else MonicaItemCardShape,
-                                            modifier = Modifier.fillMaxWidth()
+                                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                                         ) {
                                             when (walletItem.type) {
                                                 WalletListItemType.BANK_CARD -> BankCardCard(
