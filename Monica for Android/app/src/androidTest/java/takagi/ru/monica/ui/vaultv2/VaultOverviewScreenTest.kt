@@ -1,6 +1,8 @@
 package takagi.ru.monica.ui.vaultv2
 
 import android.graphics.Bitmap
+import android.graphics.Color as AndroidColor
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -13,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -36,6 +39,8 @@ import takagi.ru.monica.security.SecurityManager
 import takagi.ru.monica.ui.VaultV2FabMenu
 import takagi.ru.monica.ui.VaultV2FabMenuAction
 import takagi.ru.monica.ui.cardwallet.WalletStackOverlayHost
+import takagi.ru.monica.ui.icons.PASSWORD_ICON_TYPE_NONE
+import takagi.ru.monica.ui.icons.PASSWORD_ICON_TYPE_SIMPLE
 
 @RunWith(AndroidJUnit4::class)
 class VaultOverviewScreenTest {
@@ -48,7 +53,9 @@ class VaultOverviewScreenTest {
         VaultV2Item("bank_card:$id", VaultV2ItemType.BANK_CARD, secure.title, "", false, "$id", emptyList(), secureItem = secure)
     }
     private val passwords = (10L..12L).map { id -> buildVaultV2PasswordItems(listOf(PasswordEntry(
-        id = id, title = "Password $id", username = "demo", website = "", password = "", createdAt = Date(10),
+        id = id, title = "Password $id", username = "demo", website = if (id != 12L) "https://google.com" else "",
+        customIconType = if (id == 11L) PASSWORD_ICON_TYPE_SIMPLE else PASSWORD_ICON_TYPE_NONE,
+        customIconValue = if (id == 11L) "github" else null, password = "", createdAt = Date(10),
         bitwardenVaultId = if (id == 12L) 2 else null, isFavorite = true))).single() }
     private val rows = cards + passwords
     private val sources = listOf(VaultOverviewSource("local", "Local", "Monica"),
@@ -68,7 +75,7 @@ class VaultOverviewScreenTest {
             MaterialTheme {
                 WalletStackOverlayHost {
                 listState = rememberLazyListState()
-                Box(Modifier.fillMaxSize().statusBarsPadding()) {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
                     if (route != null) Button(onClick = { route = null }, modifier = Modifier.testTag("return_home")) {
                         Text("Return")
                     }
@@ -220,5 +227,54 @@ class VaultOverviewScreenTest {
         File(file.parentFile, "native-overview-expanded.png").outputStream().use {
             compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
+    }
+
+    @Test fun passwordIconsResolveAndSeparatedRowsKeepIndependentClickTargets() {
+        config = config.copy(hidden = setOf(VaultOverviewModule.CARDS.name))
+        showOverview()
+        fun inItems(tag: String) = compose.onNode(
+            hasTestTag(tag) and hasAnyAncestor(hasTestTag("overview_items")), useUnmergedTree = true,
+        )
+        val automaticIcon = inItems("overview_icon_password:10")
+        val customIcon = inItems("overview_icon_password:11")
+        // Both entries have a Google URL. The second must honor the chosen GitHub icon.
+        compose.waitUntil(10_000) {
+            val bitmap = automaticIcon.captureToImage().asAndroidBitmap()
+            bitmap.countPixels { color ->
+                AndroidColor.red(color) > 180 && AndroidColor.green(color) < 130 && AndroidColor.blue(color) < 130
+            } > bitmap.width * bitmap.height / 100
+        }
+        compose.waitUntil(10_000) {
+            val bitmap = customIcon.captureToImage().asAndroidBitmap()
+            bitmap.countPixels { color ->
+                val channels = listOf(AndroidColor.red(color), AndroidColor.green(color), AndroidColor.blue(color))
+                channels.max() - channels.min() < 4 && (channels.max() < 75 || channels.min() > 245)
+            } > bitmap.width * bitmap.height / 100
+        }
+        val first = inItems("overview_item_password:10").fetchSemanticsNode().boundsInRoot
+        val second = inItems("overview_item_password:11").fetchSemanticsNode().boundsInRoot
+        val gap = second.top - first.bottom
+        assertTrue("Rows should have a visible narrow gap", gap >= 1f && gap <= with(compose.density) { 4.dp.toPx() })
+        compose.onRoot().performTouchInput { click(Offset(first.center.x, (first.bottom + second.top) / 2f)) }
+        compose.runOnIdle { assertNull("The gap must not open a neighboring item", route) }
+        File(context.getExternalFilesDir("overview-verification"), "overview-grouped-items.png").outputStream().use {
+            compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        inItems("overview_item_password:10").performClick()
+        compose.runOnIdle { assertEquals("password:10", route) }
+        compose.onNodeWithTag("return_home").performClick()
+        inItems("overview_item_password:11").performClick()
+        compose.runOnIdle { assertEquals("password:11", route) }
+        compose.onNodeWithTag("return_home").performClick()
+        compose.runOnIdle { scopeKey = "bitwarden:2" }
+        inItems("overview_icon_password:12").assertIsDisplayed()
+        inItems("overview_item_password:12").performClick()
+        compose.runOnIdle { assertEquals("password:12", route) }
+    }
+
+    private fun Bitmap.countPixels(predicate: (Int) -> Boolean): Int {
+        val pixels = IntArray(width * height)
+        getPixels(pixels, 0, width, 0, 0, width, height)
+        return pixels.count(predicate)
     }
 }

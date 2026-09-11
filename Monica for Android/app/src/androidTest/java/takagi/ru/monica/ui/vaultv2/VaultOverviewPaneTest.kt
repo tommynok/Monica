@@ -1,12 +1,18 @@
 package takagi.ru.monica.ui.vaultv2
 
 import android.app.Application
+import android.graphics.Bitmap
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
@@ -22,6 +28,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 import takagi.ru.monica.R
 import takagi.ru.monica.data.*
 import takagi.ru.monica.repository.*
@@ -44,6 +51,7 @@ class VaultOverviewPaneTest {
     private lateinit var state: VaultV2PaneState
     private var appSettings by mutableStateOf(AppSettings())
     private var openedPassword: Long? = null
+    private var darkTheme by mutableStateOf(false)
 
     @Before fun prepareVault(): Unit = runBlocking {
         originalSettings = settings.exportPageAdjustmentSettings()
@@ -83,7 +91,7 @@ class VaultOverviewPaneTest {
         val keepass = keep(LocalKeePassViewModel(context.applicationContext as Application, database.localKeePassDatabaseDao(), security))
         val settingsModel = keep(SettingsViewModel(settings))
         compose.setContent {
-            MaterialTheme {
+            MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
                 state = rememberVaultV2PaneState(remember { VaultV2RetainedState() })
                 VaultV2Pane(passwordModel, totp, cards, documents, addresses, notes, passkeys,
                     keepassDatabases = emptyList(), mdbxDatabases = emptyList(), bitwardenVaults = emptyList(),
@@ -92,7 +100,7 @@ class VaultOverviewPaneTest {
                     onOpenBillingAddress = {}, onOpenNote = {}, onOpenPasskey = {}, onOpenMdbxCommitHistory = {},
                     onOpenHistory = {}, onOpenTrashPage = {}, onOpenArchivePage = {}, onOpenCommonAccountTemplates = {},
                     appSettings = appSettings, securityManager = security, biometricEnabled = false,
-                    modifier = Modifier.fillMaxSize())
+                    modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
             }
         }
         compose.waitUntil(15_000) { state.overviewSnapshot?.items?.size == 24 }
@@ -160,6 +168,52 @@ class VaultOverviewPaneTest {
             assertFalse(state.overviewListOpen)
             assertEquals("local", state.storageFilterType)
             assertEquals(position, state.overviewScrollIndex to state.overviewScrollOffset)
+        }
+    }
+
+    @Test fun groupedSearchResultsKeepSelectionSwipeAndSingleResultNavigation() {
+        showPane()
+        compose.onNodeWithTag("overview_search").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("password 2")
+        compose.onNode(hasSetTextAction()).performImeAction()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("vault_item_password:24").fetchSemanticsNodes().isNotEmpty() }
+        val ids = listOf(2, 20, 21, 22, 23, 24)
+        ids.zipWithNext { firstId, secondId ->
+            val first = compose.onNodeWithTag("vault_item_password:$firstId").fetchSemanticsNode().boundsInRoot
+            val second = compose.onNodeWithTag("vault_item_password:$secondId").fetchSemanticsNode().boundsInRoot
+            val gap = second.top - first.bottom
+            assertTrue("Filtered rows must remain separated", gap >= 1f && gap <= with(compose.density) { 4.dp.toPx() })
+        }
+        capture("vault-grouped-light.png")
+        compose.runOnIdle { darkTheme = true }
+        capture("vault-grouped-dark.png")
+        compose.onNodeWithTag("vault_item_password:20").performTouchInput { longClick() }
+        compose.onNodeWithTag("vault_item_password:24").performClick()
+        compose.runOnIdle { assertNull(openedPassword) }
+        compose.onNodeWithText("2").assertIsDisplayed()
+        Espresso.pressBack()
+        compose.onNodeWithContentDescription(context.getString(R.string.select_all)).assertDoesNotExist()
+        compose.onNode(hasSetTextAction()).assertTextEquals("password 2")
+        compose.runOnIdle { assertTrue(state.overviewListOpen) }
+        compose.onNodeWithTag("vault_item_password:2").performTouchInput { swipeRight() }
+        compose.onNodeWithContentDescription(context.getString(R.string.select_all)).assertIsDisplayed()
+        Espresso.pressBack()
+        compose.onNode(hasSetTextAction()).assertTextEquals("password 2")
+        compose.onNodeWithTag("vault_item_password:2").performTouchInput { swipeLeft() }
+        compose.onNodeWithText(context.getString(R.string.cancel)).assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
+        compose.onNode(hasSetTextAction()).performTextReplacement("password 24")
+        compose.onNode(hasSetTextAction()).performImeAction()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("vault_item_password:2").fetchSemanticsNodes().isEmpty() }
+        capture("vault-grouped-single.png")
+        compose.onNodeWithTag("vault_item_password:24").performClick()
+        compose.runOnIdle { assertEquals(24L, openedPassword) }
+    }
+
+    private fun capture(name: String) {
+        compose.waitForIdle()
+        File(context.getExternalFilesDir("overview-verification"), name).outputStream().use {
+            compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
     }
 }

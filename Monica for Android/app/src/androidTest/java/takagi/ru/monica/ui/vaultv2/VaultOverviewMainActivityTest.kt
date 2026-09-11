@@ -54,7 +54,14 @@ class VaultOverviewMainActivityTest {
                 itemData = Json.encodeToString(BankCardData(cardNumber = "4111111111111111", bankName = "Demo bank",
                     cardholderName = "DEMO", expiryMonth = "09", expiryYear = "2030")))
             val id = database.secureItemDao().insertItem(card)
-            settings.updateVaultOverviewConfig { it.copy(pinnedCards = listOf(card.copy(id = id).vaultOverviewKey())) }
+            val passwords = listOf("GitHub" to "https://github.com", "Google" to "https://google.com").map { (title, website) ->
+                val entry = PasswordEntry(title = title, website = website, username = "demo@example.com", password = "", isFavorite = true)
+                entry.copy(id = database.passwordEntryDao().insertPasswordEntry(entry))
+            }
+            settings.updateVaultOverviewConfig { it.copy(
+                pinnedCards = listOf(card.copy(id = id).vaultOverviewKey()),
+                pinnedItems = passwords.map { password -> password.vaultOverviewKey() },
+            ) }
         }
         security.setMasterPassword("overview311")
         SecurityManager.clearRuntimeUnlockCache()

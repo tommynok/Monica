@@ -83,6 +83,7 @@ fun ExpressiveTopBar(
     navigationIcon: @Composable (() -> Unit)? = null,
     onActionPillBoundsChanged: ((Rect) -> Unit)? = null,
     collapsedTitleEndPadding: Dp = 180.dp,
+    searchBackEnabled: Boolean = true,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -102,7 +103,8 @@ fun ExpressiveTopBar(
     }
 
     // Hiding the IME leaves the query and results available. A subsequent Back exits search.
-    BackHandler(enabled = isSearchExpanded && windowFocused) {
+    // A page can give selection priority while keeping the query and results visible.
+    BackHandler(enabled = isSearchExpanded && windowFocused && searchBackEnabled) {
         if (imeVisible) {
             keyboardController?.hide()
         } else {

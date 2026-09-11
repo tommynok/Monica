@@ -14,6 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -30,6 +32,8 @@ import takagi.ru.monica.data.VaultOverviewConfig
 import takagi.ru.monica.data.VaultOverviewModule
 import takagi.ru.monica.security.SecurityManager
 import takagi.ru.monica.ui.components.ExpressiveTopBar
+import takagi.ru.monica.ui.components.GroupedItemDefaults
+import takagi.ru.monica.ui.icons.VaultItemIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -167,10 +171,18 @@ internal fun VaultOverviewScreen(
                             VaultOverviewModule.ITEMS, VaultOverviewModule.FAVORITES -> {
                                 val rows = if (module == VaultOverviewModule.ITEMS) snapshot.frequentItems else snapshot.favorites
                                 if (rows.isEmpty()) OverviewEmpty(if (module == VaultOverviewModule.ITEMS) R.string.vault_overview_empty_items else R.string.vault_overview_empty_favorites)
-                                else Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                                    Column { rows.take(if (module == VaultOverviewModule.ITEMS) OVERVIEW_PREVIEW_LIMIT else 3).forEach { row ->
-                                        OverviewItemRow(row, sourceByKey[row.overviewSource()]?.name.takeIf { currentScope == "all" }, { onOpenItem(row) })
-                                    } }
+                                else Column(verticalArrangement = Arrangement.spacedBy(GroupedItemDefaults.Spacing)) {
+                                    val preview = rows.take(if (module == VaultOverviewModule.ITEMS) OVERVIEW_PREVIEW_LIMIT else 3)
+                                    preview.forEachIndexed { index, row ->
+                                        key(row.key) {
+                                            OverviewItemRow(
+                                                item = row,
+                                                source = sourceByKey[row.overviewSource()]?.name.takeIf { currentScope == "all" },
+                                                shape = GroupedItemDefaults.shape(index, preview.size),
+                                                onClick = { onOpenItem(row) },
+                                            )
+                                        }
+                                    }
                                 }
                             }
                             VaultOverviewModule.TYPES -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -274,12 +286,25 @@ internal fun VaultOverviewScreen(
 }
 
 @Composable
-private fun OverviewItemRow(item: VaultV2Item, source: String?, onClick: () -> Unit) {
+private fun OverviewItemRow(item: VaultV2Item, source: String?, shape: Shape, onClick: () -> Unit) {
     ListItem(headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(item.subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        leadingContent = { Icon(item.type.icon(), null, tint = MaterialTheme.colorScheme.primary) },
+        leadingContent = {
+            val password = item.passwordEntry
+            if (password != null) VaultItemIcon(
+                website = password.website,
+                title = password.title,
+                appPackageName = password.appPackageName,
+                customIconType = password.customIconType,
+                customIconValue = password.customIconValue,
+                defaultIcon = Icons.Default.Lock,
+                modifier = Modifier.testTag("overview_icon_${item.key}"),
+            ) else Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                Icon(item.type.icon(), null, tint = MaterialTheme.colorScheme.primary)
+            }
+        },
         trailingContent = { if (source != null) Text(source, style = MaterialTheme.typography.labelSmall, maxLines = 1) },
-        modifier = Modifier.clickable(role = Role.Button, onClick = onClick).testTag("overview_item_${item.key}"),
+        modifier = Modifier.clip(shape).clickable(role = Role.Button, onClick = onClick).testTag("overview_item_${item.key}"),
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
 }
 

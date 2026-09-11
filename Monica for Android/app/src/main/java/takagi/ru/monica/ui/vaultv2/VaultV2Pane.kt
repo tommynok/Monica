@@ -8,7 +8,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -30,7 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,10 +75,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -136,7 +136,6 @@ import takagi.ru.monica.security.maskDocumentNumberForPreview
 import takagi.ru.monica.data.model.TotpData
 import takagi.ru.monica.data.model.OtpType
 import takagi.ru.monica.data.model.PasskeyBindingCodec
-import takagi.ru.monica.data.UnmatchedIconHandlingStrategy
 import takagi.ru.monica.data.VaultV2LayoutMode
 import takagi.ru.monica.notes.domain.NoteContentCodec
 import takagi.ru.monica.repository.MdbxStoredFolderEntry
@@ -149,15 +148,10 @@ import takagi.ru.monica.ui.components.UnifiedCategoryFilterChipMenuDropdown
 import takagi.ru.monica.ui.components.UnifiedCategoryFilterChipMenuOffset
 import takagi.ru.monica.ui.components.UnifiedCategoryFilterSelection
 import takagi.ru.monica.ui.components.ExpressiveLazyListScrollbar
+import takagi.ru.monica.ui.components.GroupedItemDefaults
 import takagi.ru.monica.ui.icons.PASSWORD_ICON_TYPE_NONE
-import takagi.ru.monica.ui.icons.PASSWORD_ICON_TYPE_SIMPLE
-import takagi.ru.monica.ui.icons.PASSWORD_ICON_TYPE_UPLOADED
-import takagi.ru.monica.ui.icons.UnmatchedIconFallback
+import takagi.ru.monica.ui.icons.VaultItemIcon
 import takagi.ru.monica.ui.common.pull.rememberPullActionState
-import takagi.ru.monica.ui.icons.rememberAutoMatchedSimpleIcon
-import takagi.ru.monica.ui.icons.rememberSimpleIconBitmap
-import takagi.ru.monica.ui.icons.rememberUploadedPasswordIcon
-import takagi.ru.monica.ui.icons.shouldShowFallbackSlot
 import takagi.ru.monica.ui.PasswordQuickFolderBreadcrumb
 import takagi.ru.monica.ui.PasswordQuickFolderBreadcrumbPath
 import takagi.ru.monica.ui.PasswordQuickFolderBreadcrumbBanner
@@ -3261,6 +3255,7 @@ fun VaultV2Pane(
 				searchQuery = searchQuery,
 				onSearchQueryChange = { searchQuery = it },
 				isSearchExpanded = isSearchExpanded,
+				searchBackEnabled = selectedCount == 0,
 				onSearchExpandedChange = {
 					isSearchExpanded = it
 					if (!it && overviewSearchRoute) closeOverviewList()
@@ -4481,14 +4476,14 @@ private fun VaultV2List(
 		state = listState,
 		modifier = modifier,
 		contentPadding = PaddingValues(start = 12.dp, end = 28.dp, top = 8.dp, bottom = 96.dp),
-	verticalArrangement = Arrangement.spacedBy(6.dp),
+		verticalArrangement = Arrangement.spacedBy(GroupedItemDefaults.Spacing),
 	) {
 		if (hasVisibleQuickFilters || hasVisibleCategoryQuickFilters) {
 			item(key = "filter_row", contentType = "filter_row") {
 				Column(
 					modifier = Modifier
 						.fillMaxWidth()
-						.padding(bottom = 4.dp),
+						.padding(bottom = 8.dp),
 					verticalArrangement = Arrangement.spacedBy(0.dp)
 				) {
 					if (hasVisibleQuickFilters) {
@@ -4513,16 +4508,17 @@ private fun VaultV2List(
 			}
 		}
 
-		items(
+		itemsIndexed(
 			items = folderRows,
-			key = VaultV2FolderRowModel::key,
-			contentType = { "folder_row" },
-		) { folderRow ->
+			key = { _, row -> row.key },
+			contentType = { _, _ -> "folder_row" },
+		) { index, folderRow ->
 			VaultV2FolderRow(
 				row = folderRow,
 				onClick = { onOpenFolder(folderRow.targetFilter) },
 				onLongClick = { onLongClickFolder(folderRow) },
 				selected = selectedFolderKey == folderRow.key,
+				shape = GroupedItemDefaults.shape(index, folderRows.size),
 			)
 		}
 
@@ -4534,7 +4530,7 @@ private fun VaultV2List(
 					color = MaterialTheme.colorScheme.onSurfaceVariant,
 					modifier = Modifier
 						.fillMaxWidth()
-						.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 2.dp),
+						.padding(start = 12.dp, end = 12.dp, top = 14.dp, bottom = 6.dp),
 				)
 			}
 		}
@@ -4577,16 +4573,17 @@ private fun VaultV2List(
 					color = MaterialTheme.colorScheme.onSurfaceVariant,
 					modifier = Modifier
 						.fillMaxWidth()
-						.padding(horizontal = 12.dp, vertical = 4.dp),
+						.padding(horizontal = 12.dp, vertical = 8.dp),
 				)
 			}
 
-			items(
+			itemsIndexed(
 				items = itemsInSection,
-				key = { item -> item.key },
-				contentType = { item -> item.type },
-			) { item ->
+				key = { _, item -> item.key },
+				contentType = { _, item -> item.type },
+			) { index, item ->
 				val selected = item.key in selectedKeys
+				val cardShape = GroupedItemDefaults.shape(index, itemsInSection.size)
 				SwipeActions(
 					onSwipeLeft = { onRequestDeleteItem(item) },
 					onSwipeRight = {
@@ -4596,7 +4593,8 @@ private fun VaultV2List(
 							selectedKeys.add(item.key)
 						}
 					},
-					isSwiped = false
+					isSwiped = false,
+					cardShape = cardShape,
 				) {
 					VaultV2ItemCard(
 						item = item,
@@ -4608,6 +4606,7 @@ private fun VaultV2List(
 						appSettings = appSettings,
 						securityManager = securityManager,
 						selected = selected,
+						cardShape = cardShape,
 						onClick = {
 							if (selectedKeys.isNotEmpty()) {
 								if (selected) {
@@ -4753,6 +4752,7 @@ private fun VaultV2ItemCard(
 	appSettings: AppSettings,
 	securityManager: SecurityManager,
 	selected: Boolean,
+	cardShape: Shape,
 	onClick: () -> Unit,
 	onLongClick: () -> Unit,
 ) {
@@ -4765,8 +4765,6 @@ private fun VaultV2ItemCard(
 		VaultV2ItemType.DOCUMENT,
 		VaultV2ItemType.BILLING_ADDRESS -> Icons.Default.Badge
 	}
-	val unmatchedIconStrategy = UnmatchedIconHandlingStrategy.DEFAULT_ICON
-
 	val passwordIconSource = item.passwordEntry ?: boundPassword
 	val totpData = remember(item.totpItem?.itemData, item.totpItem?.title, securityManager) {
 		item.totpItem?.let { totpItem ->
@@ -4804,43 +4802,6 @@ private fun VaultV2ItemCard(
 		passwordIconSource != null -> passwordIconSource.customIconValue
 		else -> totpData?.customIconValue
 	}
-	val simpleIcon = if (customIconType == PASSWORD_ICON_TYPE_SIMPLE) {
-		rememberSimpleIconBitmap(
-			slug = customIconValue,
-			tintColor = MaterialTheme.colorScheme.primary,
-			enabled = true
-		)
-	} else {
-		null
-	}
-	val uploadedIcon = if (customIconType == PASSWORD_ICON_TYPE_UPLOADED) {
-		rememberUploadedPasswordIcon(customIconValue)
-	} else {
-		null
-	}
-	val autoMatchedSimpleIcon = rememberAutoMatchedSimpleIcon(
-		website = iconWebsite,
-		title = iconTitle,
-		appPackageName = iconAppPackage.ifBlank { null },
-		tintColor = MaterialTheme.colorScheme.primary,
-		enabled = customIconType == PASSWORD_ICON_TYPE_NONE
-	)
-	val favicon = if (iconWebsite.isNotBlank()) {
-		takagi.ru.monica.autofill_ng.ui.rememberFavicon(
-			url = iconWebsite,
-			enabled = autoMatchedSimpleIcon.resolved && autoMatchedSimpleIcon.slug == null
-		)
-	} else {
-		null
-	}
-	val appIcon = if (
-		iconAppPackage.isNotBlank() &&
-		!takagi.ru.monica.autofill_ng.ui.isWebAddress(iconWebsite)
-	) {
-		takagi.ru.monica.autofill_ng.ui.rememberAppIcon(iconAppPackage)
-	} else {
-		null
-	}
 	val authenticatorState = when (item.type) {
 		VaultV2ItemType.PASSWORD -> {
 			val authenticatorKey = item.passwordEntry?.authenticatorKey.orEmpty()
@@ -4877,8 +4838,6 @@ private fun VaultV2ItemCard(
 		else -> null
 	}
 
-	val cardShape = RoundedCornerShape(14.dp)
-
 	Surface(
 		shape = cardShape,
 		color = if (selected) {
@@ -4888,6 +4847,7 @@ private fun VaultV2ItemCard(
 		},
 		modifier = Modifier
 			.fillMaxWidth()
+			.testTag("vault_item_${item.key}")
 			.clip(cardShape)
 			.combinedClickable(onClick = onClick, onLongClick = onLongClick),
 	) {
@@ -4898,57 +4858,14 @@ private fun VaultV2ItemCard(
 			verticalAlignment = Alignment.CenterVertically,
 			horizontalArrangement = Arrangement.spacedBy(10.dp),
 		) {
-			when {
-				simpleIcon != null -> {
-					Image(
-						bitmap = simpleIcon,
-						contentDescription = null,
-						contentScale = ContentScale.Fit,
-						modifier = Modifier.size(40.dp).padding(2.dp)
-					)
-				}
-				uploadedIcon != null -> {
-					Image(
-						bitmap = uploadedIcon,
-						contentDescription = null,
-						contentScale = ContentScale.Fit,
-						modifier = Modifier.size(40.dp).padding(2.dp)
-					)
-				}
-				autoMatchedSimpleIcon.bitmap != null -> {
-					Image(
-						bitmap = autoMatchedSimpleIcon.bitmap,
-						contentDescription = null,
-						contentScale = ContentScale.Fit,
-						modifier = Modifier.size(40.dp).padding(2.dp)
-					)
-				}
-				favicon != null -> {
-					Image(
-						bitmap = favicon,
-						contentDescription = null,
-						contentScale = ContentScale.Crop,
-						modifier = Modifier.size(40.dp).clip(CircleShape)
-					)
-				}
-				appIcon != null -> {
-					Image(
-						bitmap = appIcon,
-						contentDescription = null,
-						contentScale = ContentScale.Crop,
-						modifier = Modifier.size(40.dp).clip(CircleShape)
-					)
-				}
-				shouldShowFallbackSlot(unmatchedIconStrategy) -> {
-					UnmatchedIconFallback(
-						strategy = unmatchedIconStrategy,
-						primaryText = iconWebsite,
-						secondaryText = iconTitle,
-						defaultIcon = icon,
-						iconSize = 40.dp
-					)
-				}
-			}
+			VaultItemIcon(
+				website = iconWebsite,
+				title = iconTitle,
+				appPackageName = iconAppPackage,
+				customIconType = customIconType,
+				customIconValue = customIconValue,
+				defaultIcon = icon,
+			)
 			Spacer(modifier = Modifier.width(2.dp))
 
 			Column(
