@@ -29,9 +29,11 @@ internal fun NotePane(
     settingsViewModel: SettingsViewModel,
     securityManager: SecurityManager,
     passwordViewModel: takagi.ru.monica.viewmodel.PasswordViewModel,
+    bitwardenViewModel: takagi.ru.monica.bitwarden.viewmodel.BitwardenViewModel,
     onNavigateToAddNote: (Long?) -> Unit,
     onNavigateToSearchedNote: (Long, String) -> Unit = { noteId, _ -> onNavigateToAddNote(noteId) },
     onSelectionModeChange: (Boolean) -> Unit,
+    onBitwardenScopeChanged: (Long?) -> Unit,
     isAddingNoteInline: Boolean,
     inlineNoteEditorId: Long?,
     onInlineNoteEditorBack: () -> Unit,
@@ -52,7 +54,9 @@ internal fun NotePane(
             onNavigateToSearchedNote = onNavigateToSearchedNote,
             securityManager = securityManager,
             passwordViewModel = passwordViewModel,
+            bitwardenViewModel = bitwardenViewModel,
             onSelectionModeChange = onSelectionModeChange,
+            onBitwardenScopeChanged = onBitwardenScopeChanged,
             showStandaloneSettingsEntry = showStandaloneSettingsEntry,
             onOpenStandaloneSettings = onOpenStandaloneSettings
         )
@@ -70,7 +74,9 @@ internal fun NotePane(
                     onNavigateToSearchedNote = onNavigateToSearchedNote,
                     securityManager = securityManager,
                     passwordViewModel = passwordViewModel,
+                    bitwardenViewModel = bitwardenViewModel,
                     onSelectionModeChange = onSelectionModeChange,
+                    onBitwardenScopeChanged = onBitwardenScopeChanged,
                     showStandaloneSettingsEntry = showStandaloneSettingsEntry,
                     onOpenStandaloneSettings = onOpenStandaloneSettings
                 )

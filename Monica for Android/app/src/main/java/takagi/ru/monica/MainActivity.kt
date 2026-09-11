@@ -976,10 +976,8 @@ fun MonicaContent(
                     popUpTo(Screen.Login.route) { inclusive = true }
                 }
             }
-            launch {
-                delay(1_200L)
-                bitwardenViewModel.requestStartupAutoSync()
-            }
+            // The visible page owns Bitwarden auto-sync, including its startup delay.
+            // Authentication alone does not identify a database to sync.
             withContext(Dispatchers.IO) {
                 runCatching {
                     delay(15_000)

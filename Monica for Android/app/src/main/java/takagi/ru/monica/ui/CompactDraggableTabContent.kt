@@ -102,6 +102,7 @@ internal fun CompactDraggableTabContent(
     onNavigateToSearchedNote: (Long, String) -> Unit,
     onNavigateToNoteDetail: (Long) -> Unit,
     onNoteSelectionModeChange: (Boolean) -> Unit,
+    onNoteBitwardenScopeChanged: (Long?) -> Unit,
     timelineViewModel: TimelineViewModel,
     passkeyViewModel: PasskeyViewModel,
     onNavigateToPasswordDetail: (Long) -> Unit,
@@ -343,6 +344,8 @@ internal fun CompactDraggableTabContent(
                     securityManager = securityManager,
                     passwordViewModel = passwordViewModel,
                     onSelectionModeChange = onNoteSelectionModeChange,
+                    bitwardenViewModel = bitwardenViewModel,
+                    onBitwardenScopeChanged = onNoteBitwardenScopeChanged,
                     showStandaloneSettingsEntry = showStandaloneSettingsEntry,
                     onOpenStandaloneSettings = onOpenStandaloneSettings
                 )

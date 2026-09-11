@@ -884,6 +884,7 @@ fun SimpleMainScreen(
     // CardWallet state
     var cardWalletSubTab by rememberSaveable { mutableStateOf(CardWalletTab.ALL) }
     var cardWalletBitwardenVaultId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var noteBitwardenVaultId by remember { mutableStateOf<Long?>(null) }
     var walletUnifiedAddType by rememberSaveable { mutableStateOf(CardWalletTab.BANK_CARDS) }
     val walletAddSaveableStateHolder = rememberSaveableStateHolder()
     val cardWalletSaveableStateHolder = rememberSaveableStateHolder()
@@ -969,6 +970,9 @@ fun SimpleMainScreen(
     LaunchedEffect(currentTab.key) {
         if (currentTab != BottomNavItem.CardWallet) {
             cardWalletBitwardenVaultId = null
+        }
+        if (currentTab != BottomNavItem.Notes) {
+            noteBitwardenVaultId = null
         }
     }
 
@@ -1811,13 +1815,14 @@ fun SimpleMainScreen(
         BottomNavItem.Passwords -> isBitwardenPasswordFilter(currentFilter)
         BottomNavItem.Authenticator -> isBitwardenTotpFilter(totpFilter)
         BottomNavItem.CardWallet -> cardWalletBitwardenVaultId != null
-        BottomNavItem.Notes,
+        BottomNavItem.Notes -> noteBitwardenVaultId != null
         BottomNavItem.Passkey,
         BottomNavItem.Send -> activeBitwardenVault != null
         else -> false
     }
     val bitwardenStatusVaultId = when (currentTab) {
         BottomNavItem.CardWallet -> cardWalletBitwardenVaultId
+        BottomNavItem.Notes -> noteBitwardenVaultId
         else -> activeBitwardenVault?.id
     }
     val activeVaultSyncState = bitwardenStatusVaultId?.let(bitwardenSyncStatusByVault::get)
@@ -2205,6 +2210,7 @@ fun SimpleMainScreen(
                     onNoteSelectionModeChange = { isSelectionMode ->
                         isNoteSelectionMode = isSelectionMode
                     },
+                    onNoteBitwardenScopeChanged = { noteBitwardenVaultId = it },
                     timelineViewModel = timelineViewModel,
                     passkeyViewModel = passkeyViewModel,
                     onNavigateToPasswordDetail = onNavigateToPasswordDetail,
@@ -2534,6 +2540,8 @@ fun SimpleMainScreen(
                         settingsViewModel = settingsViewModel,
                         securityManager = securityManager,
                         passwordViewModel = passwordViewModel,
+                        bitwardenViewModel = bitwardenViewModel,
+                        onBitwardenScopeChanged = { noteBitwardenVaultId = it },
                         onNavigateToAddNote = handleNoteOpen,
                         onNavigateToSearchedNote = onNavigateToSearchedNote,
                         onSelectionModeChange = { isSelectionMode ->
@@ -2921,6 +2929,8 @@ fun SimpleMainScreen(
                             settingsViewModel = settingsViewModel,
                             securityManager = securityManager,
                             passwordViewModel = passwordViewModel,
+                            bitwardenViewModel = bitwardenViewModel,
+                            onBitwardenScopeChanged = { noteBitwardenVaultId = it },
                             onNavigateToAddNote = handleNoteOpen,
                             onNavigateToSearchedNote = onNavigateToSearchedNote,
                             onSelectionModeChange = { isSelectionMode ->

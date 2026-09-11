@@ -125,6 +125,7 @@ import takagi.ru.monica.attachments.facade.AttachmentUriMetadata
 import takagi.ru.monica.bitwarden.BitwardenVaultPremiumStore
 import takagi.ru.monica.bitwarden.api.BitwardenApiFactory
 import takagi.ru.monica.bitwarden.viewmodel.BitwardenViewModel
+import takagi.ru.monica.bitwarden.ui.BitwardenAutoSyncEffect
 import takagi.ru.monica.bitwarden.sync.buildHeadline
 import takagi.ru.monica.bitwarden.sync.isUserVisibleSyncInProgress
 import takagi.ru.monica.data.bitwarden.BitwardenSend
@@ -208,14 +209,17 @@ fun SendScreen(
     }
 
 
+    BitwardenAutoSyncEffect(
+        viewModel = bitwardenViewModel,
+        selectedVaultId = activeVault?.id,
+        isAllView = false,
+        enabled = canCreateSend
+    )
     LaunchedEffect(activeVault?.id, unlockState, anyVaultUnlocked) {
         if (anyVaultUnlocked) {
             // 至少有一个已解锁账号就允许刷新视图：当前活跃账号触发自动同步，
             // 其它账号通过 sendsAcrossVaults 直接复用本地缓存。
             delay(1_200L)
-            if (canCreateSend) {
-                bitwardenViewModel.requestPageEnterAutoSync()
-            }
             bitwardenViewModel.loadSends(forceRemoteSync = false)
         }
     }

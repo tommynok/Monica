@@ -71,6 +71,7 @@ import takagi.ru.monica.data.resolveOwnership
 import takagi.ru.monica.bitwarden.sync.isUserVisibleSyncInProgress
 import takagi.ru.monica.bitwarden.repository.BitwardenRepository
 import takagi.ru.monica.bitwarden.ui.BitwardenAutoSyncEffect
+import takagi.ru.monica.bitwarden.viewmodel.BitwardenViewModel
 import takagi.ru.monica.data.KeePassStorageLocation
 import takagi.ru.monica.data.bitwarden.BitwardenVault
 import takagi.ru.monica.repository.KeePassCompatibilityBridge
@@ -110,8 +111,6 @@ import takagi.ru.monica.notes.ui.model.NoteListItemUiModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import takagi.ru.monica.util.VibrationPatterns
-import takagi.ru.monica.utils.SavedCategoryFilterState
-import androidx.lifecycle.viewmodel.compose.viewModel
 import java.util.Locale
 import takagi.ru.monica.ui.password.PasswordTopActionsDropdownMenu
 
@@ -124,7 +123,9 @@ fun NoteListScreen(
     onNavigateToSearchedNote: (Long, String) -> Unit = { noteId, _ -> onNavigateToAddNote(noteId) },
     securityManager: SecurityManager,
     passwordViewModel: takagi.ru.monica.viewmodel.PasswordViewModel,
+    bitwardenViewModel: BitwardenViewModel,
     onSelectionModeChange: (Boolean) -> Unit = {},
+    onBitwardenScopeChanged: (Long?) -> Unit = {},
     showStandaloneSettingsEntry: Boolean = false,
     onOpenStandaloneSettings: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -171,6 +172,7 @@ fun NoteListScreen(
     DisposableEffect(Unit) {
         onDispose {
             onSelectionModeChange(false)
+            onBitwardenScopeChanged(null)
         }
     }
     
@@ -218,23 +220,23 @@ fun NoteListScreen(
     var selectedCategoryFilter by remember { mutableStateOf<NoteCategoryFilter>(NoteCategoryFilter.All) }
     val savedCategoryFilterState by settingsManager
         .categoryFilterStateFlow(SettingsManager.CategoryFilterScope.NOTE)
-        .collectAsState(initial = SavedCategoryFilterState())
+        .collectAsState(initial = null)
     var hasRestoredCategoryFilter by remember { mutableStateOf(false) }
 
     LaunchedEffect(savedCategoryFilterState, hasRestoredCategoryFilter) {
         if (hasRestoredCategoryFilter) return@LaunchedEffect
-        selectedCategoryFilter = decodeNoteCategoryFilter(savedCategoryFilterState)
+        val persisted = savedCategoryFilterState ?: return@LaunchedEffect
+        selectedCategoryFilter = decodeNoteCategoryFilter(persisted)
         hasRestoredCategoryFilter = true
     }
 
-    LaunchedEffect(selectedCategoryFilter) {
+    LaunchedEffect(selectedCategoryFilter, hasRestoredCategoryFilter) {
+        if (!hasRestoredCategoryFilter) return@LaunchedEffect
         viewModel.setDraftStorageTarget(selectedCategoryFilter.toDraftStorageTarget())
-        if (hasRestoredCategoryFilter) {
-            settingsManager.updateCategoryFilterState(
-                scope = SettingsManager.CategoryFilterScope.NOTE,
-                state = encodeNoteCategoryFilter(selectedCategoryFilter)
-            )
-        }
+        settingsManager.updateCategoryFilterState(
+            scope = SettingsManager.CategoryFilterScope.NOTE,
+            state = encodeNoteCategoryFilter(selectedCategoryFilter)
+        )
     }
 
     val resolvedPasswordViewModel = passwordViewModel
@@ -263,6 +265,7 @@ fun NoteListScreen(
         is NoteCategoryFilter.MdbxDatabase -> UnifiedCategoryFilterSelection.MdbxDatabaseFilter(filter.databaseId)
     }
     val handleCategorySelection: (UnifiedCategoryFilterSelection) -> Unit = { selection ->
+        hasRestoredCategoryFilter = true
         selectedCategoryFilter = when (selection) {
             is UnifiedCategoryFilterSelection.All -> NoteCategoryFilter.All
             is UnifiedCategoryFilterSelection.Local -> NoteCategoryFilter.Local
@@ -320,13 +323,8 @@ fun NoteListScreen(
         is NoteCategoryFilter.BitwardenVaultUncategorized -> true
         else -> false
     }
-    val selectedBitwardenVaultId = when (val filter = selectedCategoryFilter) {
-        is NoteCategoryFilter.BitwardenVault -> filter.vaultId
-        is NoteCategoryFilter.BitwardenFolderFilter -> filter.vaultId
-        is NoteCategoryFilter.BitwardenVaultStarred -> filter.vaultId
-        is NoteCategoryFilter.BitwardenVaultUncategorized -> filter.vaultId
-        else -> null
-    }
+    val selectedBitwardenVaultId = selectedCategoryFilter.bitwardenVaultIdForSync()
+        .takeIf { hasRestoredCategoryFilter }
     val selectedKeePassDatabaseId = when (val filter = selectedCategoryFilter) {
         is NoteCategoryFilter.KeePassDatabase -> filter.databaseId
         is NoteCategoryFilter.KeePassGroupFilter -> filter.databaseId
@@ -334,8 +332,10 @@ fun NoteListScreen(
         is NoteCategoryFilter.KeePassDatabaseUncategorized -> filter.databaseId
         else -> null
     }
-    val bitwardenViewModel: takagi.ru.monica.bitwarden.viewmodel.BitwardenViewModel = viewModel()
     val bitwardenSyncStatusByVault by bitwardenViewModel.syncStatusByVault.collectAsState()
+    LaunchedEffect(selectedBitwardenVaultId) {
+        onBitwardenScopeChanged(selectedBitwardenVaultId)
+    }
     BitwardenAutoSyncEffect(
         viewModel = bitwardenViewModel,
         selectedVaultId = selectedBitwardenVaultId,

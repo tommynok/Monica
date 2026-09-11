@@ -26,6 +26,14 @@ internal sealed interface NoteCategoryFilter {
     data class MdbxDatabase(val databaseId: Long) : NoteCategoryFilter
 }
 
+internal fun NoteCategoryFilter.bitwardenVaultIdForSync(): Long? = when (this) {
+    is NoteCategoryFilter.BitwardenVault -> vaultId
+    is NoteCategoryFilter.BitwardenFolderFilter -> vaultId
+    is NoteCategoryFilter.BitwardenVaultStarred -> vaultId
+    is NoteCategoryFilter.BitwardenVaultUncategorized -> vaultId
+    else -> null
+}
+
 internal fun NoteCategoryFilter.toDraftStorageTarget(): NoteDraftStorageTarget = when (this) {
     NoteCategoryFilter.All,
     NoteCategoryFilter.Local,
