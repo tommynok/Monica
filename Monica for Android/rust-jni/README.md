@@ -28,3 +28,9 @@ cargo ndk \
 `RustListSortCore` 通过一个 `LongArray` 传入版本号及每行的收藏标记、排序号、ID、更新时间，返回原列表的索引排列。它不读取字符串、卡号或验证码密钥。批次版本、行宽和收藏值先验证，Kotlin 再校验返回值是完整排列；不可用时保持原 Kotlin 排序。
 
 页面在后台准备列表，小列表直接使用 Kotlin。Android `ListFirstFrameInstrumentedTest` 同时验证两种现有平局规则，并测量包含数组打包、JNI 拷贝和索引映射的完整调用开销，避免只比较 Rust 内部排序时间。
+
+## 卡叠归组
+
+`RustWalletStackCore` 对大列表一次性处理可见成员查找、去重和归组，只接收数字 ID，返回组索引与卡片索引。Kotlin 校验完整排列并保留原对象，小列表或原生调用不可用时使用 Kotlin 回退。整个批次在后台执行，动画帧不调用 JNI。
+
+协议、排序语义、动效保护和包含 JNI 开销的测量方法见 [卡叠性能说明](../docs/wallet-stack-rust-performance.md)。`cargo test` 覆盖协议边界和归组行为，Android 测试对照真实 JNI 与 Kotlin 的完整结果。

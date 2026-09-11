@@ -6,6 +6,7 @@ import androidx.compose.runtime.produceState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import takagi.ru.monica.data.WalletStack
+import takagi.ru.monica.rustcore.RustWalletStackCore
 
 @Composable
 internal fun rememberWalletStackEntries(
@@ -58,6 +59,87 @@ internal sealed interface WalletStackListEntry {
 
 /** Pin groups ahead of the sorted singles; filters never rewrite persisted membership. */
 internal fun projectWalletStacks(
+    visibleCards: List<WalletListItem>,
+    stacks: List<WalletStack>,
+    showIndividualCards: Boolean = false,
+    selectionMode: Boolean = false
+): List<WalletStackListEntry> {
+    if (visibleCards.size >= 256 && stacks.isNotEmpty() && (!showIndividualCards || selectionMode)) {
+        projectWalletStacksNative(visibleCards, stacks, selectionMode)?.let { return it }
+    }
+    return projectWalletStacksKotlin(visibleCards, stacks, showIndividualCards, selectionMode)
+}
+
+/** Includes packing, JNI, validation and mapping; never used by the animation's frame loop. */
+internal fun projectWalletStacksNative(
+    visibleCards: List<WalletListItem>,
+    stacks: List<WalletStack>,
+    selectionMode: Boolean
+): List<WalletStackListEntry>? {
+    val indices = RustWalletStackCore.projectIndices(visibleCards, stacks, selectionMode, WalletListItem::id)
+        ?: return null
+    return decodeWalletStackProjection(visibleCards, stacks, selectionMode, indices)
+}
+
+/** Require a complete, unique index permutation before accepting a native projection. */
+internal fun decodeWalletStackProjection(
+    visibleCards: List<WalletListItem>,
+    stacks: List<WalletStack>,
+    selectionMode: Boolean,
+    indices: IntArray
+): List<WalletStackListEntry>? {
+    if (indices.size < 3 || indices[0] != 1) return null
+    val groupCount = indices[1]
+    if (groupCount !in 0..minOf(stacks.size, visibleCards.size)) return null
+    val seenCards = BooleanArray(visibleCards.size)
+    val seenGroups = BooleanArray(stacks.size)
+    var cursor = 2
+    var acceptedCards = 0
+    fun readCards(count: Int): List<WalletListItem>? {
+        if (count < 0 || count > indices.size - cursor || count > visibleCards.size - acceptedCards) return null
+        val cards = ArrayList<WalletListItem>(count)
+        repeat(count) {
+            val index = indices[cursor++]
+            if (index !in visibleCards.indices || seenCards[index]) return null
+            seenCards[index] = true
+            cards.add(visibleCards[index])
+        }
+        acceptedCards += count
+        return cards
+    }
+    val entries = ArrayList<WalletStackListEntry>()
+    repeat(groupCount) {
+        if (indices.size - cursor < 2) return null
+        val groupIndex = indices[cursor++]
+        val memberCount = indices[cursor++]
+        if (groupIndex !in stacks.indices || seenGroups[groupIndex] ||
+            memberCount < (if (selectionMode) 1 else 2)
+        ) return null
+        seenGroups[groupIndex] = true
+        val stack = stacks[groupIndex]
+        val members = readCards(memberCount) ?: return null
+        if (selectionMode) {
+            entries.add(WalletStackListEntry.SelectionHeader(stack, members))
+            members.forEachIndexed { index, card ->
+                entries.add(WalletStackListEntry.Single(card, stack.id, index == members.lastIndex))
+            }
+        } else {
+            entries.add(WalletStackListEntry.Stack(stack, members))
+        }
+    }
+    if (cursor >= indices.size) return null
+    val singleCount = indices[cursor++]
+    if (singleCount != indices.size - cursor) return null
+    val singles = readCards(singleCount) ?: return null
+    if (acceptedCards != visibleCards.size) return null
+    if (selectionMode && groupCount > 0 && singles.isNotEmpty()) {
+        entries.add(WalletStackListEntry.SelectionHeader(null, singles))
+    }
+    singles.forEach { entries.add(WalletStackListEntry.Single(it)) }
+    return entries
+}
+
+internal fun projectWalletStacksKotlin(
     visibleCards: List<WalletListItem>,
     stacks: List<WalletStack>,
     showIndividualCards: Boolean = false,

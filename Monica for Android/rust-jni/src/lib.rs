@@ -2,6 +2,7 @@
 
 mod list_sort;
 mod search;
+mod wallet_stack;
 
 use jni::objects::{JByteArray, JClass, JIntArray, JLongArray, JString};
 use jni::sys::{jboolean, jbyteArray, jint, jintArray, jstring, JNI_FALSE, JNI_TRUE};
@@ -10,6 +11,25 @@ use monica_rust_crypto::{derive_argon2id, derive_pbkdf2_sha256};
 use search::{filter_metadata_batch, SearchQuery};
 
 const RUST_CORE_VERSION: &str = "monica-rust-jni/0.5.0-kdf";
+
+#[no_mangle]
+pub extern "system" fn Java_takagi_ru_monica_rustcore_RustWalletStackCore_nativeProjectIndices(
+    env: JNIEnv,
+    _class: JClass,
+    metadata: JLongArray,
+    selection: jboolean,
+) -> jintArray {
+    let result = (|| {
+        let len = env.get_array_length(&metadata).ok()? as usize;
+        let mut batch = vec![0_i64; len];
+        env.get_long_array_region(&metadata, 0, &mut batch).ok()?;
+        let indices = wallet_stack::project_indices(&batch, selection != JNI_FALSE)?;
+        let output = env.new_int_array(indices.len() as i32).ok()?;
+        env.set_int_array_region(&output, 0, &indices).ok()?;
+        Some(output.into_raw())
+    })();
+    result.unwrap_or(std::ptr::null_mut())
+}
 
 #[no_mangle]
 pub extern "system" fn Java_takagi_ru_monica_rustcore_RustListSortCore_nativeSortIndices(

@@ -194,7 +194,8 @@ internal fun WalletStackBrowser(
         if (animateEntrance) expansion.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
         latestOnOpened()
     }
-    LaunchedEffect(cards.map(WalletListItem::id)) {
+    val cardIds = remember(cards) { cards.map(WalletListItem::id) }
+    LaunchedEffect(cardIds) {
         position = position.coerceIn(0f, cards.lastIndex.toFloat())
         snapshotFlow { focusIndex }.distinctUntilChanged().collect { latestOnFocus(cards[it].id) }
     }
