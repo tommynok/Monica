@@ -26,6 +26,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.flow.flowOf
 import java.io.File
 import java.util.Date
 import org.junit.Assert.*
@@ -34,11 +35,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import takagi.ru.monica.R
 import takagi.ru.monica.data.*
+import takagi.ru.monica.data.bitwarden.BitwardenVault
 import takagi.ru.monica.data.model.BankCardData
 import takagi.ru.monica.security.SecurityManager
 import takagi.ru.monica.ui.VaultV2FabMenu
 import takagi.ru.monica.ui.VaultV2FabMenuAction
 import takagi.ru.monica.ui.cardwallet.WalletStackOverlayHost
+import takagi.ru.monica.ui.components.UnifiedCategoryFilterChipMenu
+import takagi.ru.monica.ui.components.UnifiedCategoryFilterSelection
 import takagi.ru.monica.ui.icons.PASSWORD_ICON_TYPE_NONE
 import takagi.ru.monica.ui.icons.PASSWORD_ICON_TYPE_SIMPLE
 
@@ -58,8 +62,12 @@ class VaultOverviewScreenTest {
         customIconValue = if (id == 11L) "github" else null, password = "", createdAt = Date(10),
         bitwardenVaultId = if (id == 12L) 2 else null, isFavorite = true))).single() }
     private val rows = cards + passwords
+    private val keepassDatabases = listOf(LocalKeePassDatabase(id = 3L, name = "Locked", filePath = "locked.kdbx"))
+    private val mdbxDatabases = listOf(LocalMdbxDatabase(id = 4L, name = "Project MDBX", filePath = "project.mdbx"))
+    private val bitwardenVaults = listOf(BitwardenVault(id = 2L, email = "work@example.test", displayName = "Work", isLocked = false))
     private val sources = listOf(VaultOverviewSource("local", "Local", "Monica"),
-        VaultOverviewSource("bitwarden:2", "Work", "Bitwarden"), VaultOverviewSource("keepass:3", "Locked", "KeePass", locked = true))
+        VaultOverviewSource("bitwarden:2", "Work", "Bitwarden"), VaultOverviewSource("keepass:3", "Locked", "KeePass", locked = true),
+        VaultOverviewSource("mdbx:4", "Project MDBX", "MDBX"))
     private var config by mutableStateOf(VaultOverviewConfig(pinnedCards = cards.map { it.overviewIdentity() },
         pinnedItems = passwords.map { it.overviewIdentity() }))
     private var scopeKey by mutableStateOf("local")
@@ -84,7 +92,7 @@ class VaultOverviewScreenTest {
                             buildVaultOverviewSnapshot(rows, sources, scopeKey, config, emptyMap(), emptyMap(),
                                 emptyList(), emptyList(), emptyMap(), emptyList(), aggregate = ::aggregateVaultOverviewKotlin)
                         }
-                        VaultOverviewScreen(snapshot, sources, scopeKey, config, listState,
+                        VaultOverviewScreen(snapshot, sources, keepassDatabases, mdbxDatabases, bitwardenVaults, scopeKey, config, listState,
                             selectedCardKey = selectedCardKey, onSelectedCardChange = { selectedCardKey = it },
                             cardStackState = cardStack, isDetailVisible = wideDetail && route != null,
                             securityManager = manager, reduceAnimations = false, trashCount = 0,
@@ -117,7 +125,11 @@ class VaultOverviewScreenTest {
         compose.onNodeWithTag("overview_pin_row_bank_card:1").assertDoesNotExist()
         Espresso.pressBack()
         compose.onNodeWithTag("vault_add_fab").performClick()
-        compose.onNodeWithText(context.getString(R.string.item_type_password), useUnmergedTree = true).performClick()
+        compose.onNode(
+            hasText(context.getString(R.string.item_type_password)) and
+                !hasAnyAncestor(hasTestTag("overview_modules")),
+            useUnmergedTree = true,
+        ).performClick()
         compose.runOnIdle { assertEquals("password:local", created) }
     }
 
@@ -195,22 +207,66 @@ class VaultOverviewScreenTest {
 
     @Test fun databaseScopeReachesTheExistingTypeListAndLockedDatabasesStayHidden() {
         showOverview()
-        compose.onNodeWithTag("overview_scope").performClick()
-        compose.onNodeWithTag("overview_source_bitwarden:2").performClick()
+        compose.onNodeWithTag("overview_scope")
+            .assert(hasAnyAncestor(hasTestTag("overview_top_bar"))).performClick()
+        compose.onNode(isPopup()).assertExists()
+        compose.onNodeWithText(context.getString(R.string.category_selection_menu_quick_filters)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.category_selection_menu_folders)).assertDoesNotExist()
+        databaseChoice(context.getString(R.string.category_selection_menu_local_database)).assertIsSelected()
+        File(context.getExternalFilesDir("overview-verification"), "overview-database-menu.png").outputStream().use {
+            compose.onNodeWithTag("overview_database_menu").captureToImage().asAndroidBitmap()
+                .compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        databaseChoice("work@example.test").performClick()
+        compose.onNodeWithTag("overview_database_menu").assertDoesNotExist()
         compose.onNodeWithTag("overview_modules").performScrollToNode(hasTestTag("overview_type_PASSWORD"))
         compose.onNodeWithTag("overview_type_PASSWORD").performClick()
         compose.runOnIdle { assertEquals("type:PASSWORD:bitwarden:2", route) }
         compose.onNodeWithTag("return_home").performClick()
         compose.onNodeWithTag("overview_scope").performClick()
-        compose.onNodeWithTag("overview_source_keepass:3").performClick()
+        databaseChoice("work@example.test").assertIsSelected()
+        databaseChoice("Project MDBX").performClick()
+        compose.runOnIdle { assertEquals("mdbx:4", scopeKey) }
+        compose.onNodeWithTag("overview_scope").performClick()
+        databaseChoice("Project MDBX").assertIsSelected()
+        databaseChoice(context.getString(R.string.category_all)).performClick()
+        compose.runOnIdle { assertEquals("all", scopeKey) }
+        compose.onNodeWithTag("overview_scope").performClick()
+        databaseChoice(context.getString(R.string.category_all)).assertIsSelected()
+        databaseChoice(context.getString(R.string.category_selection_menu_local_database)).performClick()
+        compose.runOnIdle { assertEquals("local", scopeKey) }
+        compose.onNodeWithTag("overview_scope").performClick()
+        databaseChoice("Locked").performClick()
         compose.onNodeWithTag("overview_modules").assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.vault_overview_unlock)).assertIsDisplayed()
+    }
+
+    private fun databaseChoice(label: String) = compose.onNode(
+        hasText(label) and hasAnyAncestor(hasTestTag("overview_database_menu")),
+    )
+
+    @Test fun theFullCategoryMenuStillShowsQuickFiltersAndFolders() {
+        compose.setContent {
+            MaterialTheme {
+                UnifiedCategoryFilterChipMenu(
+                    visible = true, onDismiss = {}, selected = UnifiedCategoryFilterSelection.Local, onSelect = {},
+                    categories = listOf(Category(id = 1L, name = "Existing folder")),
+                    keepassDatabases = keepassDatabases, mdbxDatabases = mdbxDatabases,
+                    bitwardenVaults = bitwardenVaults, getBitwardenFolders = { flowOf(emptyList()) },
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.category_selection_menu_databases)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.category_selection_menu_quick_filters)).assertIsDisplayed()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Existing folder").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(context.getString(R.string.category_selection_menu_folders)).assertIsDisplayed()
+        compose.onNodeWithText("Existing folder").assertIsDisplayed()
     }
 
     @Test fun theSharedActionPillSwipeOpensSearchInTheCurrentDatabase() {
         showOverview()
         compose.onNodeWithTag("overview_scope").performClick()
-        compose.onNodeWithTag("overview_source_bitwarden:2").performClick()
+        databaseChoice("work@example.test").performClick()
         compose.onNodeWithTag("overview_customize").performTouchInput { swipeLeft() }
         compose.runOnIdle { assertEquals("search:bitwarden:2", route) }
     }

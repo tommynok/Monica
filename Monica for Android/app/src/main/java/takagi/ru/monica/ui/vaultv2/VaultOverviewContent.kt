@@ -151,6 +151,7 @@ internal fun VaultOverviewContent(
     }
     VaultOverviewScreen(
         snapshot = snapshot?.takeIf { it.scope == currentScope && it.accessibleSources == available }, sources = sources,
+        keepassDatabases = keepassDatabases, mdbxDatabases = mdbxDatabases, bitwardenVaults = bitwardenVaults,
         currentScope = currentScope, config = config, listState = listState, securityManager = securityManager,
         selectedCardKey = selectedCardKey, onSelectedCardChange = onSelectedCardChange,
         cardStackState = cardStackState, isDetailVisible = isDetailVisible,

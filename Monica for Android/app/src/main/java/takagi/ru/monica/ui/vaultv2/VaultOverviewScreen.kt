@@ -22,6 +22,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,11 +33,16 @@ import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import takagi.ru.monica.R
+import takagi.ru.monica.data.LocalKeePassDatabase
+import takagi.ru.monica.data.LocalMdbxDatabase
 import takagi.ru.monica.data.VaultOverviewConfig
 import takagi.ru.monica.data.VaultOverviewModule
+import takagi.ru.monica.data.bitwarden.BitwardenVault
 import takagi.ru.monica.security.SecurityManager
 import takagi.ru.monica.ui.components.ExpressiveTopBar
 import takagi.ru.monica.ui.components.GroupedItemDefaults
+import takagi.ru.monica.ui.components.UnifiedCategoryFilterChipMenuDropdown
+import takagi.ru.monica.ui.components.UnifiedDatabaseFilterChipMenu
 import takagi.ru.monica.ui.icons.VaultItemIcon
 import takagi.ru.monica.ui.common.pull.PullSearchDefaults
 import takagi.ru.monica.ui.common.pull.PullSearchHint
@@ -46,6 +53,9 @@ import takagi.ru.monica.ui.common.pull.rememberPullToSearchState
 internal fun VaultOverviewScreen(
     snapshot: VaultOverviewSnapshot?,
     sources: List<VaultOverviewSource>,
+    keepassDatabases: List<LocalKeePassDatabase>,
+    mdbxDatabases: List<LocalMdbxDatabase>,
+    bitwardenVaults: List<BitwardenVault>,
     currentScope: String,
     config: VaultOverviewConfig,
     listState: LazyListState,
@@ -104,23 +114,38 @@ internal fun VaultOverviewScreen(
             onSearchQueryChange = {},
             isSearchExpanded = false,
             onSearchExpandedChange = { expanded -> if (expanded) onSearch() },
-            collapsedTitleEndPadding = 128.dp,
+            collapsedTitleEndPadding = 180.dp,
             modifier = Modifier.testTag("overview_top_bar"),
             actions = {
+                IconButton(onClick = { showSources = true },
+                    modifier = Modifier.testTag("overview_scope").semantics { stateDescription = scopeName }) {
+                    Icon(Icons.Default.Folder, stringResource(R.string.vault_overview_choose_database))
+                }
                 IconButton(onClick = onSearch, modifier = Modifier.testTag("overview_search")) {
                     Icon(Icons.Default.Search, stringResource(R.string.search))
                 }
-                IconButton(onClick = { showCustomization = true }, modifier = Modifier.testTag("overview_customize")) {
-                    Icon(Icons.Default.Tune, stringResource(R.string.vault_overview_customize))
+                Box {
+                    IconButton(onClick = { showCustomization = true }, modifier = Modifier.testTag("overview_customize")) {
+                        Icon(Icons.Default.Tune, stringResource(R.string.vault_overview_customize))
+                    }
+                    UnifiedCategoryFilterChipMenuDropdown(
+                        expanded = showSources,
+                        onDismissRequest = { showSources = false },
+                    ) {
+                        UnifiedDatabaseFilterChipMenu(
+                            selected = overviewScopeSelection(currentScope),
+                            onSelect = { selection ->
+                                showSources = false
+                                onSelectScope(selection.overviewScope())
+                            },
+                            keepassDatabases = keepassDatabases,
+                            mdbxDatabases = mdbxDatabases,
+                            bitwardenVaults = bitwardenVaults,
+                            modifier = Modifier.testTag("overview_database_menu"),
+                        )
+                    }
                 }
             },
-        )
-        AssistChip(
-            onClick = { showSources = true },
-            label = { Text(scopeName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            leadingIcon = { Icon(if (selectedSource?.locked == true) Icons.Default.Lock else Icons.Default.Storage, null, Modifier.size(16.dp)) },
-            trailingIcon = { Icon(Icons.Default.ExpandMore, null, Modifier.size(16.dp)) },
-            modifier = Modifier.padding(start = 24.dp, bottom = 6.dp).testTag("overview_scope"),
         )
         if (selectedSource?.locked == true) {
             Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -249,17 +274,6 @@ internal fun VaultOverviewScreen(
         walletCards, sourceByKey, selectedCardKey, cardStackState, isDetailVisible, reduceAnimations,
         onSelectedCardChange, onOpenItem, onManage = { pinModule = VaultOverviewModule.CARDS.name },
     )
-    if (showSources) OverviewSheet(stringResource(R.string.vault_overview_choose_database), { showSources = false }) {
-        item { Text(stringResource(R.string.vault_overview_choose_database_hint), style = MaterialTheme.typography.bodySmall) }
-        item {
-            OverviewSourceRow(VaultOverviewSource("all", stringResource(R.string.vault_overview_all_databases), ""), null,
-                currentScope == "all", { showSources = false; onSelectScope("all") })
-        }
-        items(sources, key = { it.key }) { source ->
-            OverviewSourceRow(source, snapshot?.sourceCounts?.get(source.key), source.key == currentScope,
-                { showSources = false; onSelectScope(source.key) })
-        }
-    }
     if (showCustomization) VaultOverviewCustomizationSheet(config, onConfigChange, { showCustomization = false })
     if (showAllFolders && snapshot != null) OverviewSheet(stringResource(R.string.vault_overview_folder_list), { showAllFolders = false }) {
         items(snapshot.folders, key = { it.key }) { folder ->
