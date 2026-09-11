@@ -27,9 +27,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import takagi.ru.monica.R
@@ -281,45 +279,19 @@ internal fun VaultOverviewScreen(
         }
     }
     if (pinModule != null && snapshot != null) {
-        val cards = pinModule == VaultOverviewModule.CARDS.name
-        var query by rememberSaveable(pinModule) { mutableStateOf("") }
-        val candidates by produceState<List<VaultV2Item>>(emptyList(), snapshot.items, cards, query) {
-            value = withContext(Dispatchers.Default) {
-                snapshot.items.filter { (it.type in overviewCardTypes) == cards &&
-                    (query.isBlank() || it.title.contains(query, true) || it.subtitle.contains(query, true)) }
-            }
-        }
-        OverviewSheet(stringResource(if (cards) R.string.vault_overview_pin_cards else R.string.vault_overview_pin_items), { pinModule = null }) {
-            item { Text(stringResource(R.string.vault_overview_pin_hint), style = MaterialTheme.typography.bodySmall) }
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) { Text(stringResource(R.string.vault_overview_recommend));
-                        Text(stringResource(R.string.vault_overview_recommend_hint), style = MaterialTheme.typography.bodySmall) }
-                    Switch(checked = if (cards) config.recommendCards else config.recommendItems,
-                        onCheckedChange = { checked -> onConfigChange { if (cards) it.copy(recommendCards = checked) else it.copy(recommendItems = checked) } })
-                }
-            }
-            item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text(stringResource(R.string.search)) }) }
-            if (candidates.isEmpty()) item { OverviewEmpty(R.string.vault_overview_empty_pins) }
-            items(candidates, key = { it.overviewIdentity() }) { item ->
-                val key = item.overviewIdentity()
-                val checked = key in if (cards) config.pinnedCards else config.pinnedItems
-                val toggle: () -> Unit = { onConfigChange { old ->
-                    val pins = if (cards) old.pinnedCards else old.pinnedItems
-                    val next = if (key in pins) pins - key else pins + key
-                    if (cards) old.copy(pinnedCards = next) else old.copy(pinnedItems = next)
-                } }
-                Row(Modifier.fillMaxWidth().testTag("overview_pin_row_${item.key}")
-                    .clickable(role = Role.Checkbox, onClick = toggle), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).padding(vertical = 12.dp)) {
-                        Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(sourceByKey[item.overviewSource()]?.name.orEmpty(), style = MaterialTheme.typography.bodySmall)
-                    }
-                    Checkbox(checked = checked, onCheckedChange = { toggle() })
-                }
-            }
-        }
+        VaultOverviewPickerSheet(
+            cards = pinModule == VaultOverviewModule.CARDS.name,
+            items = snapshot.items,
+            sources = sources,
+            currentScope = currentScope,
+            keepassDatabases = keepassDatabases,
+            mdbxDatabases = mdbxDatabases,
+            bitwardenVaults = bitwardenVaults,
+            config = config,
+            securityManager = securityManager,
+            onConfigChange = onConfigChange,
+            onDismiss = { pinModule = null },
+        )
     }
 }
 
@@ -371,18 +343,10 @@ private fun OverviewFolderRow(folder: VaultOverviewFolder, sources: Map<String, 
 
 @Composable
 private fun OverviewSourceRow(source: VaultOverviewSource, count: Int?, selected: Boolean, onClick: () -> Unit) {
-    val sourceIcon = when (source.key.substringBefore(':')) {
-        "all" -> Icons.Default.List
-        "local" -> Icons.Default.Smartphone
-        "keepass" -> Icons.Default.Key
-        "mdbx" -> Icons.Default.Storage
-        "bitwarden" -> Icons.Default.CloudSync
-        else -> Icons.Default.Storage
-    }
     Surface(shape = RoundedCornerShape(16.dp), color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
         ListItem(headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = { Text(source.provider, style = MaterialTheme.typography.bodySmall) },
-            leadingContent = { Icon(sourceIcon, null) },
+            leadingContent = { Icon(overviewSourceIcon(source.key), null) },
             trailingContent = {
                 if (source.locked) Text(stringResource(R.string.vault_overview_locked), style = MaterialTheme.typography.labelSmall)
                 else if (selected) Icon(Icons.Default.Check, null)
@@ -390,6 +354,14 @@ private fun OverviewSourceRow(source: VaultOverviewSource, count: Int?, selected
             }, modifier = Modifier.clickable(role = Role.Button, onClick = onClick).testTag("overview_source_${source.key}"),
             colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
     }
+}
+
+internal fun overviewSourceIcon(source: String): androidx.compose.ui.graphics.vector.ImageVector = when (source.substringBefore(':')) {
+    "all" -> Icons.Default.List
+    "local" -> Icons.Default.Smartphone
+    "keepass" -> Icons.Default.Key
+    "bitwarden" -> Icons.Default.CloudSync
+    else -> Icons.Default.Storage
 }
 
 @Composable

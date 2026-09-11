@@ -71,6 +71,7 @@
 -keep class takagi.ru.monica.rustcore.RustPasswordListCore { *; }
 -keep class takagi.ru.monica.rustcore.RustListSortCore { *; }
 -keep class takagi.ru.monica.rustcore.RustWalletStackCore { *; }
+-keep class takagi.ru.monica.rustcore.RustVaultPickerCore { *; }
 
 # 移除日志 (Release构建)
 -assumenosideeffects class android.util.Log {

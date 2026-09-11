@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+internal const val VAULT_OVERVIEW_MAX_PINS = 200
+
 enum class VaultOverviewModule {
     CARDS, ITEMS, FAVORITES, TYPES, FOLDERS, DATABASES, ARCHIVE, TRASH;
 
@@ -29,8 +31,8 @@ data class VaultOverviewConfig(
             .filter { it in VaultOverviewModule.defaultOrder },
         hidden = hidden.intersect(VaultOverviewModule.defaultOrder.toSet()),
         collapsed = collapsed.intersect(VaultOverviewModule.defaultOrder.toSet()),
-        pinnedCards = pinnedCards.filter(String::isNotBlank).distinct().take(200),
-        pinnedItems = pinnedItems.filter(String::isNotBlank).distinct().take(200),
+        pinnedCards = pinnedCards.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_PINS),
+        pinnedItems = pinnedItems.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_PINS),
         scope = scope.takeIf {
             it == "all" || it == "local" || (DATABASE_SCOPE.matches(it) && it.substringAfter(':').toLongOrNull() != null)
         } ?: "local",
