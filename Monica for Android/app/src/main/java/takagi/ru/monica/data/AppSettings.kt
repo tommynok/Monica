@@ -569,6 +569,8 @@ data class AppSettings(
     val authenticatorCardHideCodeByDefault: Boolean = false, // 验证器卡片默认隐藏验证码
     val authenticatorLayoutMode: AuthenticatorLayoutMode = AuthenticatorLayoutMode.STANDARD,
     val vaultV2LayoutMode: VaultV2LayoutMode = VaultV2LayoutMode.CLASSIC,
+    val vaultOverviewEnabled: Boolean = true,
+    val vaultOverviewConfig: VaultOverviewConfig = VaultOverviewConfig(),
     val passwordListQuickFiltersEnabled: Boolean = true, // 密码列表快捷筛选开关（默认开启）
     val passwordListQuickFilterItems: List<PasswordListQuickFilterItem> = PasswordListQuickFilterItem.DEFAULT_ORDER, // 密码列表快捷筛选显示内容
     val passwordListCategoryQuickFiltersEnabled: Boolean = true, // 密码列表分类快捷筛选开关（默认开启）

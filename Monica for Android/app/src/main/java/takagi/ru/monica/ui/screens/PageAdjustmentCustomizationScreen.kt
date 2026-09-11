@@ -185,6 +185,13 @@ fun PageAdjustmentCustomizationScreen(
                 }
             )
 
+            SwitchSettingsCard(
+                title = stringResource(R.string.vault_overview_enabled_title),
+                subtitle = stringResource(R.string.vault_overview_enabled_desc),
+                checked = settings.vaultOverviewEnabled,
+                onCheckedChange = viewModel::updateVaultOverviewEnabled
+            )
+
             PageAdjustmentEntryCard(
                 title = stringResource(R.string.password_list_customization_title),
                 subtitle = stringResource(R.string.password_list_customization_subtitle),

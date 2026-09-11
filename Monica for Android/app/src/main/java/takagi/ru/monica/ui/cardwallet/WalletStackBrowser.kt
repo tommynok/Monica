@@ -105,14 +105,22 @@ internal fun WalletStackBrowser(
     onRevealCover: () -> Unit,
     onDismiss: () -> Unit,
     onOpenCard: (WalletListItem) -> Unit,
-    onManage: () -> Unit
+    onManage: () -> Unit,
+    title: String? = null,
+    reduceAnimations: Boolean = false,
+    sourceName: (WalletListItem) -> String? = { null },
 ) {
     val cards = entry.cards
     if (cards.isEmpty()) return
     val navigation = LocalAnimatedVisibilityScope.current?.transition
-    val handlesBack = navigation == null || navigation.targetState == EnterExitState.Visible
-    val isNavigationActive = handlesBack &&
-        (navigation == null || navigation.currentState == EnterExitState.Visible)
+    // Overlay callbacks can outlive the navigation frame that created them. Read the
+    // transition when an action runs instead of capturing its returning/exiting state.
+    val handlesBack by remember(navigation) {
+        derivedStateOf { navigation == null || navigation.targetState == EnterExitState.Visible }
+    }
+    val isNavigationActive by remember(navigation) {
+        derivedStateOf { handlesBack && (navigation == null || navigation.currentState == EnterExitState.Visible) }
+    }
     val scope = rememberCoroutineScope()
     var position by rememberSaveable(entry.stack.id) {
         mutableFloatStateOf(cards.indexOfFirst { it.id == initialCardId }.coerceAtLeast(0).toFloat())
@@ -180,7 +188,7 @@ internal fun WalletStackBrowser(
             latestOnCollapse(cards[focusIndex].id)
             scope.launch {
                 scroll.stopScroll(MutatePriority.PreventUserInput)
-                expansion.animateTo(0f, tween(360, easing = FastOutSlowInEasing))
+                expansion.animateTo(0f, tween(if (reduceAnimations) 0 else 360, easing = FastOutSlowInEasing))
                 // Paint the real cover underneath the matching final animation frame before
                 // removing the overlay. This avoids an empty or stale-cover frame.
                 latestOnRevealCover()
@@ -191,7 +199,7 @@ internal fun WalletStackBrowser(
     }
 
     LaunchedEffect(entry.stack.id) {
-        if (animateEntrance) expansion.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
+        if (animateEntrance) expansion.animateTo(1f, tween(if (reduceAnimations) 0 else 420, easing = FastOutSlowInEasing))
         latestOnOpened()
     }
     val cardIds = remember(cards) { cards.map(WalletListItem::id) }
@@ -199,7 +207,7 @@ internal fun WalletStackBrowser(
         position = position.coerceIn(0f, cards.lastIndex.toFloat())
         snapshotFlow { focusIndex }.distinctUntilChanged().collect { latestOnFocus(cards[it].id) }
     }
-    val stackName = stringResource(R.string.wallet_stack_default_name)
+    val stackName = title ?: stringResource(R.string.wallet_stack_default_name)
     val nextLabel = stringResource(R.string.wallet_stack_next)
     val previousLabel = stringResource(R.string.wallet_stack_previous)
     WalletStackOverlay {
@@ -327,6 +335,10 @@ internal fun WalletStackBrowser(
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(stringResource(R.string.wallet_stack_browse_hint), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    sourceName(cards[focusIndex])?.let { source ->
+                        Text(source, style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 IconButton(onClick = { if (isNavigationActive) onManage() }, enabled = !closing) {
                     Icon(Icons.Default.MoreVert, stringResource(R.string.wallet_stack_manage))

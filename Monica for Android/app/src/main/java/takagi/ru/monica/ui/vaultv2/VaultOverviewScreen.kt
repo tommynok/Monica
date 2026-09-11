@@ -1,0 +1,402 @@
+package takagi.ru.monica.ui.vaultv2
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
+import takagi.ru.monica.R
+import takagi.ru.monica.data.VaultOverviewConfig
+import takagi.ru.monica.data.VaultOverviewModule
+import takagi.ru.monica.security.SecurityManager
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun VaultOverviewScreen(
+    snapshot: VaultOverviewSnapshot?,
+    sources: List<VaultOverviewSource>,
+    currentScope: String,
+    config: VaultOverviewConfig,
+    listState: LazyListState,
+    selectedCardKey: String? = null,
+    onSelectedCardChange: (String) -> Unit = {},
+    securityManager: SecurityManager,
+    reduceAnimations: Boolean,
+    trashCount: Int?,
+    onConfigChange: ((VaultOverviewConfig) -> VaultOverviewConfig) -> Unit,
+    onSelectScope: (String) -> Unit,
+    onOpenSource: (String) -> Unit,
+    onOpenItem: (VaultV2Item) -> Unit,
+    onOpenType: (VaultV2ItemType) -> Unit,
+    onOpenFolder: (VaultOverviewFolder) -> Unit,
+    onFavorites: () -> Unit,
+    onArchive: () -> Unit,
+    onTrash: () -> Unit,
+    onAllItems: () -> Unit,
+    onSearch: () -> Unit,
+    onUnlock: () -> Unit,
+    cardStackState: VaultOverviewCardStackState = remember { VaultOverviewCardStackState() },
+    isDetailVisible: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    var showSources by rememberSaveable { mutableStateOf(false) }
+    var showCustomization by rememberSaveable { mutableStateOf(false) }
+    var pinModule by rememberSaveable { mutableStateOf<String?>(null) }
+    var showAllFolders by rememberSaveable { mutableStateOf(false) }
+    val sourceByKey = remember(sources) { sources.associateBy(VaultOverviewSource::key) }
+    val selectedSource = sourceByKey[currentScope]
+    val scopeName = selectedSource?.name ?: stringResource(
+        if (currentScope == "all") R.string.vault_overview_all_databases else R.string.vault_overview_choose_database)
+    val visibleModules = remember(config.order, config.hidden) {
+        config.order.filterNot(config.hidden::contains).map(VaultOverviewModule::valueOf)
+    }
+    val cardsVisible = VaultOverviewModule.CARDS in visibleModules && VaultOverviewModule.CARDS.name !in config.collapsed
+    val walletCards = if (cardsVisible && snapshot != null && selectedSource?.locked != true) {
+        rememberOverviewWalletCards(snapshot.cards, currentScope, securityManager, cardStackState)
+    } else null
+    LaunchedEffect(currentScope, cardsVisible, selectedSource?.locked) {
+        if (!cardsVisible || selectedSource?.locked == true) cardStackState.clear()
+    }
+    Column(modifier.fillMaxSize().testTag("vault_overview_screen")) {
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.vault_overview_title), Modifier.weight(1f),
+                style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            IconButton(onClick = onSearch, modifier = Modifier.testTag("overview_search")) {
+                Icon(Icons.Default.Search, stringResource(R.string.search))
+            }
+            FilledTonalIconButton(onClick = { showCustomization = true }, modifier = Modifier.testTag("overview_customize")) {
+                Icon(Icons.Default.Tune, stringResource(R.string.vault_overview_customize))
+            }
+        }
+        AssistChip(
+            onClick = { showSources = true },
+            label = { Text(scopeName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            leadingIcon = { Icon(if (selectedSource?.locked == true) Icons.Default.Lock else Icons.Default.Storage, null, Modifier.size(16.dp)) },
+            trailingIcon = { Icon(Icons.Default.ExpandMore, null, Modifier.size(16.dp)) },
+            modifier = Modifier.padding(start = 20.dp, bottom = 6.dp).testTag("overview_scope"),
+        )
+        if (selectedSource?.locked == true) {
+            Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.Lock, null, Modifier.size(40.dp))
+                Text(stringResource(R.string.vault_overview_locked), style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(top = 16.dp))
+                Text(stringResource(R.string.vault_overview_locked_hint), modifier = Modifier.padding(vertical = 16.dp))
+                Button(onClick = onUnlock) { Text(stringResource(R.string.vault_overview_unlock)) }
+            }
+        } else if (snapshot == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        } else {
+            LazyColumn(state = listState, modifier = Modifier.weight(1f).testTag("overview_modules"),
+                userScrollEnabled = !cardStackState.expanded || isDetailVisible,
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 116.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                if (currentScope == "all" && sources.any { it.locked }) item(key = "locked_notice") {
+                    Text(stringResource(R.string.vault_overview_locked_excluded, sources.count { it.locked }),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                items(visibleModules, key = { it.name }, contentType = { it.name }) { module ->
+                    val collapsed = module.name in config.collapsed
+                    val count = when (module) {
+                        VaultOverviewModule.CARDS -> snapshot.cards.size
+                        VaultOverviewModule.ITEMS -> snapshot.frequentItems.size
+                        VaultOverviewModule.FAVORITES -> snapshot.favorites.size
+                        VaultOverviewModule.FOLDERS -> snapshot.folders.size
+                        VaultOverviewModule.DATABASES -> sources.size
+                        else -> null
+                    }
+                    if (module == VaultOverviewModule.ARCHIVE || module == VaultOverviewModule.TRASH) {
+                        OverviewNavigationRow(
+                            title = stringResource(module.titleRes()),
+                            icon = if (module == VaultOverviewModule.ARCHIVE) Icons.Default.Archive else Icons.Default.DeleteOutline,
+                            count = if (module == VaultOverviewModule.ARCHIVE) snapshot.archiveCount else trashCount,
+                            onClick = if (module == VaultOverviewModule.ARCHIVE) onArchive else onTrash,
+                            modifier = Modifier.testTag("overview_${module.name.lowercase()}"),
+                        )
+                    } else Column(Modifier.testTag("overview_${module.name.lowercase()}")) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.weight(1f).testTag("overview_toggle_${module.name}").clickable(role = Role.Button) {
+                                onConfigChange { it.copy(collapsed = if (collapsed) it.collapsed - module.name else it.collapsed + module.name) }
+                            }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(if (collapsed) Icons.Default.ChevronRight else Icons.Default.ExpandMore, null, Modifier.size(18.dp))
+                                Text(stringResource(module.titleRes()), Modifier.padding(start = 6.dp),
+                                    style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                count?.let { Text(it.toString(), Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            }
+                            if (module == VaultOverviewModule.CARDS || module == VaultOverviewModule.ITEMS) {
+                                IconButton(onClick = { pinModule = module.name }, modifier = Modifier.testTag("overview_pin_${module.name.lowercase()}")) {
+                                    Icon(Icons.Default.Add, stringResource(if (module == VaultOverviewModule.CARDS) R.string.vault_overview_pin_cards else R.string.vault_overview_pin_items))
+                                }
+                            } else if (module == VaultOverviewModule.FAVORITES) {
+                                TextButton(onClick = onFavorites) { Text(stringResource(R.string.vault_overview_view_all)) }
+                            }
+                        }
+                        if (!collapsed) when (module) {
+                            VaultOverviewModule.CARDS -> if (snapshot.cards.isEmpty()) OverviewEmpty(R.string.vault_overview_empty_cards)
+                                else OverviewCards(walletCards, sourceByKey, selectedCardKey, listState,
+                                    cardStackState, isDetailVisible, onManage = { pinModule = VaultOverviewModule.CARDS.name })
+                            VaultOverviewModule.ITEMS, VaultOverviewModule.FAVORITES -> {
+                                val rows = if (module == VaultOverviewModule.ITEMS) snapshot.frequentItems else snapshot.favorites
+                                if (rows.isEmpty()) OverviewEmpty(if (module == VaultOverviewModule.ITEMS) R.string.vault_overview_empty_items else R.string.vault_overview_empty_favorites)
+                                else Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                                    Column { rows.take(if (module == VaultOverviewModule.ITEMS) OVERVIEW_PREVIEW_LIMIT else 3).forEach { row ->
+                                        OverviewItemRow(row, sourceByKey[row.overviewSource()]?.name.takeIf { currentScope == "all" }, { onOpenItem(row) })
+                                    } }
+                                }
+                            }
+                            VaultOverviewModule.TYPES -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                VaultV2ItemType.entries.chunked(2).forEach { pair -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    pair.forEach { type -> OverviewNavigationRow(stringResource(type.titleRes()), type.icon(),
+                                        snapshot.typeCounts[type] ?: 0, { onOpenType(type) }, Modifier.weight(1f).testTag("overview_type_${type.name}")) }
+                                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                                } }
+                            }
+                            VaultOverviewModule.FOLDERS -> {
+                                if (snapshot.folders.isEmpty()) OverviewEmpty(R.string.vault_overview_empty_folders)
+                                else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    snapshot.folders.take(6).forEach { folder -> OverviewFolderRow(folder, sourceByKey, currentScope, onOpenFolder) }
+                                    if (snapshot.folders.size > 6) TextButton(onClick = { showAllFolders = true }) {
+                                        Text(stringResource(R.string.vault_overview_folder_list))
+                                    }
+                                }
+                            }
+                            VaultOverviewModule.DATABASES -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                sources.forEach { source -> OverviewSourceRow(source, snapshot.sourceCounts[source.key],
+                                    selected = source.key == currentScope, onClick = {
+                                        if (source.locked) onSelectScope(source.key) else onOpenSource(source.key)
+                                    }) }
+                            }
+                            else -> Unit
+                        }
+                    }
+                }
+                if (visibleModules.isEmpty()) item { OverviewEmpty(R.string.vault_overview_hidden_hint) }
+                item(key = "all_items") {
+                    FilledTonalButton(onClick = onAllItems, modifier = Modifier.fillMaxWidth().testTag("overview_all_items")) {
+                        Text(stringResource(R.string.vault_overview_all_items))
+                        Icon(Icons.Default.ChevronRight, null, Modifier.padding(start = 8.dp).size(18.dp))
+                    }
+                }
+            }
+        }
+    }
+    if (cardsVisible && snapshot != null) OverviewCardStackBrowser(
+        walletCards, sourceByKey, selectedCardKey, cardStackState, isDetailVisible, reduceAnimations,
+        onSelectedCardChange, onOpenItem, onManage = { pinModule = VaultOverviewModule.CARDS.name },
+    )
+    if (showSources) OverviewSheet(stringResource(R.string.vault_overview_choose_database), { showSources = false }) {
+        item { Text(stringResource(R.string.vault_overview_choose_database_hint), style = MaterialTheme.typography.bodySmall) }
+        item {
+            OverviewSourceRow(VaultOverviewSource("all", stringResource(R.string.vault_overview_all_databases), ""), null,
+                currentScope == "all", { showSources = false; onSelectScope("all") })
+        }
+        items(sources, key = { it.key }) { source ->
+            OverviewSourceRow(source, snapshot?.sourceCounts?.get(source.key), source.key == currentScope,
+                { showSources = false; onSelectScope(source.key) })
+        }
+    }
+    if (showCustomization) VaultOverviewCustomizationSheet(config, onConfigChange, { showCustomization = false })
+    if (showAllFolders && snapshot != null) OverviewSheet(stringResource(R.string.vault_overview_folder_list), { showAllFolders = false }) {
+        items(snapshot.folders, key = { it.key }) { folder ->
+            OverviewFolderRow(folder, sourceByKey, currentScope) { showAllFolders = false; onOpenFolder(it) }
+        }
+    }
+    if (pinModule != null && snapshot != null) {
+        val cards = pinModule == VaultOverviewModule.CARDS.name
+        var query by rememberSaveable(pinModule) { mutableStateOf("") }
+        val candidates by produceState<List<VaultV2Item>>(emptyList(), snapshot.items, cards, query) {
+            value = withContext(Dispatchers.Default) {
+                snapshot.items.filter { (it.type in overviewCardTypes) == cards &&
+                    (query.isBlank() || it.title.contains(query, true) || it.subtitle.contains(query, true)) }
+            }
+        }
+        OverviewSheet(stringResource(if (cards) R.string.vault_overview_pin_cards else R.string.vault_overview_pin_items), { pinModule = null }) {
+            item { Text(stringResource(R.string.vault_overview_pin_hint), style = MaterialTheme.typography.bodySmall) }
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) { Text(stringResource(R.string.vault_overview_recommend));
+                        Text(stringResource(R.string.vault_overview_recommend_hint), style = MaterialTheme.typography.bodySmall) }
+                    Switch(checked = if (cards) config.recommendCards else config.recommendItems,
+                        onCheckedChange = { checked -> onConfigChange { if (cards) it.copy(recommendCards = checked) else it.copy(recommendItems = checked) } })
+                }
+            }
+            item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text(stringResource(R.string.search)) }) }
+            if (candidates.isEmpty()) item { OverviewEmpty(R.string.vault_overview_empty_pins) }
+            items(candidates, key = { it.overviewIdentity() }) { item ->
+                val key = item.overviewIdentity()
+                val checked = key in if (cards) config.pinnedCards else config.pinnedItems
+                val toggle: () -> Unit = { onConfigChange { old ->
+                    val pins = if (cards) old.pinnedCards else old.pinnedItems
+                    val next = if (key in pins) pins - key else pins + key
+                    if (cards) old.copy(pinnedCards = next) else old.copy(pinnedItems = next)
+                } }
+                Row(Modifier.fillMaxWidth().testTag("overview_pin_row_${item.key}")
+                    .clickable(role = Role.Checkbox, onClick = toggle), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(vertical = 12.dp)) {
+                        Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(sourceByKey[item.overviewSource()]?.name.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                    }
+                    Checkbox(checked = checked, onCheckedChange = { toggle() })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverviewItemRow(item: VaultV2Item, source: String?, onClick: () -> Unit) {
+    ListItem(headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(item.subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        leadingContent = { Icon(item.type.icon(), null, tint = MaterialTheme.colorScheme.primary) },
+        trailingContent = { if (source != null) Text(source, style = MaterialTheme.typography.labelSmall, maxLines = 1) },
+        modifier = Modifier.clickable(role = Role.Button, onClick = onClick).testTag("overview_item_${item.key}"),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
+}
+
+@Composable
+private fun OverviewNavigationRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, count: Int?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            count?.let { Text(it.toString(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+}
+
+@Composable
+private fun OverviewFolderRow(folder: VaultOverviewFolder, sources: Map<String, VaultOverviewSource>, scope: String, onClick: (VaultOverviewFolder) -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        ListItem(headlineContent = { Text(folder.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            supportingContent = if (scope == "all") ({ Text(sources[folder.sourceKey]?.name.orEmpty(), style = MaterialTheme.typography.bodySmall) }) else null,
+            leadingContent = { Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.primary) },
+            trailingContent = { Text(folder.count.toString(), style = MaterialTheme.typography.labelMedium) },
+            modifier = Modifier.clickable(role = Role.Button) { onClick(folder) }.testTag("overview_folder_${folder.key}"),
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
+    }
+}
+
+@Composable
+private fun OverviewSourceRow(source: VaultOverviewSource, count: Int?, selected: Boolean, onClick: () -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
+        ListItem(headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            supportingContent = { Text(source.provider, style = MaterialTheme.typography.bodySmall) },
+            leadingContent = { Icon(if (source.locked) Icons.Default.Lock else Icons.Default.Storage, null) },
+            trailingContent = {
+                if (source.locked) Text(stringResource(R.string.vault_overview_locked), style = MaterialTheme.typography.labelSmall)
+                else if (selected) Icon(Icons.Default.Check, null)
+                else count?.let { Text(it.toString(), style = MaterialTheme.typography.labelMedium) }
+            }, modifier = Modifier.clickable(role = Role.Button, onClick = onClick).testTag("overview_source_${source.key}"),
+            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
+    }
+}
+
+@Composable
+private fun OverviewEmpty(text: Int) { Text(stringResource(text), Modifier.fillMaxWidth().padding(vertical = 16.dp),
+    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OverviewSheet(title: String, onDismiss: () -> Unit, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 560.dp), contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(horizontal = 16.dp)) { Text(stringResource(R.string.vault_overview_done)) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun VaultOverviewCustomizationSheet(config: VaultOverviewConfig,
+    onChange: ((VaultOverviewConfig) -> VaultOverviewConfig) -> Unit, onDismiss: () -> Unit) {
+    var order by remember(config.order) { mutableStateOf(config.order) }
+    val listState = rememberLazyListState()
+    fun move(from: Int, to: Int) {
+        if (from !in order.indices || to !in order.indices) return
+        order = order.toMutableList().apply { add(to, removeAt(from)) }
+        val newOrder = order
+        onChange { it.copy(order = newOrder) }
+    }
+    val reorder = rememberReorderableLazyListState(listState) { from, to -> move(from.index, to.index) }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Text(stringResource(R.string.vault_overview_customize), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp))
+        Text(stringResource(R.string.vault_overview_customize_hint), style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+        LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp).testTag("overview_module_settings"),
+            contentPadding = PaddingValues(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(order, key = { it }) { id -> ReorderableItem(reorder, key = id) {
+                val title = stringResource(VaultOverviewModule.valueOf(id).titleRes())
+                val index = order.indexOf(id)
+                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.DragHandle, null, Modifier.size(36.dp).longPressDraggableHandle())
+                        Checkbox(id !in config.hidden, { checked -> onChange { it.copy(hidden = if (checked) it.hidden - id else it.hidden + id) } },
+                            modifier = Modifier.testTag("overview_visible_$id"))
+                        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        IconButton(onClick = { move(index, index - 1) }, enabled = index > 0,
+                            modifier = Modifier.testTag("overview_move_up_$id")) { Icon(Icons.Default.KeyboardArrowUp, stringResource(R.string.vault_overview_move_up, title)) }
+                        IconButton(onClick = { move(index, index + 1) }, enabled = index < order.lastIndex,
+                            modifier = Modifier.testTag("overview_move_down_$id")) { Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.vault_overview_move_down, title)) }
+                    }
+                }
+            } }
+        }
+        Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = { onChange { it.copy(order = VaultOverviewModule.defaultOrder, hidden = emptySet(), collapsed = setOf(VaultOverviewModule.DATABASES.name)) } }) { Text(stringResource(R.string.vault_overview_reset)) }
+            Button(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.vault_overview_done)) }
+        }
+    }
+}
+
+internal fun VaultOverviewModule.titleRes(): Int = when (this) {
+    VaultOverviewModule.CARDS -> R.string.vault_overview_cards
+    VaultOverviewModule.ITEMS -> R.string.vault_overview_items
+    VaultOverviewModule.FAVORITES -> R.string.vault_overview_favorites
+    VaultOverviewModule.TYPES -> R.string.vault_overview_types
+    VaultOverviewModule.FOLDERS -> R.string.vault_overview_folders
+    VaultOverviewModule.DATABASES -> R.string.vault_overview_databases
+    VaultOverviewModule.ARCHIVE -> R.string.vault_overview_archive
+    VaultOverviewModule.TRASH -> R.string.vault_overview_trash
+}
+
+internal fun VaultV2ItemType.titleRes(): Int = when (this) {
+    VaultV2ItemType.PASSWORD -> R.string.item_type_password
+    VaultV2ItemType.AUTHENTICATOR -> R.string.item_type_authenticator
+    VaultV2ItemType.NOTE -> R.string.vault_overview_note
+    VaultV2ItemType.PASSKEY -> R.string.vault_overview_passkey
+    VaultV2ItemType.BANK_CARD -> R.string.item_type_bank_card
+    VaultV2ItemType.DOCUMENT -> R.string.item_type_document
+    VaultV2ItemType.BILLING_ADDRESS -> R.string.billing_address
+}
+
+internal fun VaultV2ItemType.icon(): androidx.compose.ui.graphics.vector.ImageVector = when (this) {
+    VaultV2ItemType.PASSWORD -> Icons.Default.Key
+    VaultV2ItemType.AUTHENTICATOR -> Icons.Default.Security
+    VaultV2ItemType.NOTE -> Icons.Default.Description
+    VaultV2ItemType.PASSKEY -> Icons.Default.VpnKey
+    VaultV2ItemType.BANK_CARD -> Icons.Default.CreditCard
+    VaultV2ItemType.DOCUMENT -> Icons.Default.Badge
+    VaultV2ItemType.BILLING_ADDRESS -> Icons.Default.Home
+}
