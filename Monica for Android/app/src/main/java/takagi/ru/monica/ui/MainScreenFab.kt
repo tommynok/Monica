@@ -87,7 +87,7 @@ internal fun BoxScope.MainScreenFabOverlay(
     onFabExpandedChange: (Boolean) -> Unit,
     fastScrollStripVisible: Boolean,
     onFastScrollStripVisibleChange: (Boolean) -> Unit,
-    fastScrollStripProgress: Float,
+    fastScrollStripProgress: () -> Float,
     onFastScrollProgressChange: (Float) -> Unit,
     fastScrollIndicatorLabel: String?,
     vaultV2FastScrollbarInteracting: Boolean,
@@ -444,7 +444,7 @@ internal fun BoxScope.MainScreenFabOverlay(
 
             FastScrollPanel(
                 visible = fastScrollStripVisible,
-                progress = fastScrollStripProgress,
+                progress = if (fastScrollStripVisible) fastScrollStripProgress() else 0f,
                 indicatorLabel = fastScrollIndicatorLabel,
                 onProgressChange = onFastScrollProgressChange,
                 onDismiss = { onFastScrollStripVisibleChange(false) },

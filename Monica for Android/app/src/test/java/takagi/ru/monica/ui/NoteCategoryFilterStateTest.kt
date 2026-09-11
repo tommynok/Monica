@@ -3,7 +3,7 @@ package takagi.ru.monica.ui
 import androidx.compose.runtime.saveable.SaverScope
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import takagi.ru.monica.ui.screens.NoteCategoryFilter
+import takagi.ru.monica.notes.domain.NoteCategoryFilter
 import takagi.ru.monica.ui.screens.NoteCategoryFilterSaver
 
 class NoteCategoryFilterStateTest {

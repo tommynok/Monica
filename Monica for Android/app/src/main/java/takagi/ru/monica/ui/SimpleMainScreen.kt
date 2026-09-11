@@ -3237,10 +3237,12 @@ fun SimpleMainScreen(
         onFabExpandedChange = { expanded -> isFabExpanded = expanded },
         fastScrollStripVisible = isFastScrollStripVisible,
         onFastScrollStripVisibleChange = { visible -> isFastScrollStripVisible = visible },
-        fastScrollStripProgress = if (currentTab == BottomNavItem.VaultV2) {
-            vaultV2PaneState.fastScrollProgress
-        } else {
-            passwordFastScrollStripProgress
+        fastScrollStripProgress = {
+            if (currentTab == BottomNavItem.VaultV2) {
+                vaultV2PaneState.fastScrollProgress
+            } else {
+                passwordFastScrollStripProgress
+            }
         },
         onFastScrollProgressChange = if (currentTab == BottomNavItem.VaultV2) {
             vaultV2PaneState::requestFastScroll

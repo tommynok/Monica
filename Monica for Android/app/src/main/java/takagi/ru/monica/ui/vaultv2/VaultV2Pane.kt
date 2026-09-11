@@ -1834,7 +1834,6 @@ fun VaultV2Pane(
 	}
 	val savedCategoryFilterState by savedCategoryFilterFlow.collectAsState(initial = null)
 	val fastScrollRequestKey = state.fastScrollRequestKey
-	val fastScrollProgress = state.fastScrollProgress
 	LaunchedEffect(
 		state,
 		state.hasInitializedStorageFilter,
@@ -3107,7 +3106,7 @@ fun VaultV2Pane(
 		}
 	}
 
-	LaunchedEffect(fastScrollRequestKey, fastScrollProgress, sectionLayouts, filteredItems.size) {
+	LaunchedEffect(fastScrollRequestKey, sectionLayouts, filteredItems.size) {
 		if (fastScrollRequestKey <= lastHandledFastScrollRequestKey) {
 			return@LaunchedEffect
 		}
@@ -3118,7 +3117,7 @@ fun VaultV2Pane(
 		}
 
 		val targetItemIndex = (
-			fastScrollProgress.coerceIn(0f, 1f) * (filteredItems.size - 1)
+			state.fastScrollProgress.coerceIn(0f, 1f) * (filteredItems.size - 1)
 		).roundToInt().coerceIn(0, filteredItems.size - 1)
 		val targetLazyIndex = vaultV2LazyIndexForItemIndex(
 			sectionLayouts = sectionLayouts,
@@ -3730,6 +3729,7 @@ fun VaultV2Pane(
 				listState = listState,
 				modifier = Modifier
 					.align(Alignment.CenterEnd)
+					.testTag("vault_scrollbar")
 					.padding(vertical = 8.dp),
 				labelForIndex = { lazyIndex ->
 					vaultV2SectionTitleForLazyIndex(

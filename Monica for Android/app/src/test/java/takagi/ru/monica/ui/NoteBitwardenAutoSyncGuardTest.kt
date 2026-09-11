@@ -6,7 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import takagi.ru.monica.ui.screens.NoteCategoryFilter
+import takagi.ru.monica.notes.domain.NoteCategoryFilter
 import takagi.ru.monica.ui.screens.bitwardenVaultIdForSync
 import takagi.ru.monica.ui.screens.decodeNoteCategoryFilter
 import takagi.ru.monica.ui.screens.encodeNoteCategoryFilter
