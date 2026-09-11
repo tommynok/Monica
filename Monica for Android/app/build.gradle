@@ -288,10 +288,9 @@ dependencies {
     // DataStore
     implementation libs.androidx.datastore.preferences
     
-    // TOTP and QR Code
+    // TOTP and QR Code (zxing 负责二维码/条码的生成与识别)
     implementation libs.zxing.core
     implementation libs.zxing.android.embedded
-    implementation 'com.google.mlkit:barcode-scanning:17.3.0'
     
     // Camera
     implementation libs.androidx.camera.core
