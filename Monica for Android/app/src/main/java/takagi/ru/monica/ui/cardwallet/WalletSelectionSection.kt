@@ -1,6 +1,8 @@
 package takagi.ru.monica.ui.cardwallet
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.triStateToggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -17,7 +20,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TriStateCheckbox
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +63,7 @@ internal fun WalletSelectionSectionHeader(
     val shape = if (entry.stack != null) {
         RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     } else RoundedCornerShape(16.dp)
+    val selectionInteraction = remember { MutableInteractionSource() }
 
     Row(
         modifier = modifier
@@ -65,13 +71,23 @@ internal fun WalletSelectionSectionHeader(
             .testTag("wallet_selection_header_${entry.stack?.id ?: "unstacked"}")
             .clip(shape)
             .background(if (entry.stack != null) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
-            .triStateToggleable(state = selectionState, role = Role.Checkbox, onClick = onToggleSelection)
+            .triStateToggleable(
+                state = selectionState,
+                interactionSource = selectionInteraction,
+                indication = null,
+                role = Role.Checkbox,
+                onClick = onToggleSelection
+            )
             .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Box(
-            Modifier.size(48.dp).testTag("wallet_selection_checkbox_${entry.stack?.id ?: "unstacked"}"),
+            // Keep feedback on the checkbox so the header and card frames remain one surface.
+            Modifier.size(48.dp)
+                .testTag("wallet_selection_checkbox_${entry.stack?.id ?: "unstacked"}")
+                .clip(CircleShape)
+                .indication(selectionInteraction, ripple(bounded = false, radius = 24.dp)),
             contentAlignment = Alignment.Center
         ) {
             TriStateCheckbox(state = selectionState, onClick = null)
