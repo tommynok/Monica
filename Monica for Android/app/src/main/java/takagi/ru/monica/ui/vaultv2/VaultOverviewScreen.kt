@@ -327,6 +327,7 @@ internal fun VaultOverviewScreen(
         VaultOverviewPickerSheet(
             cards = pinModule == VaultOverviewModule.CARDS.name,
             items = snapshot.items,
+            currentFrequentItems = if (pinModule == VaultOverviewModule.CARDS.name) snapshot.cards else frequentPreview,
             sources = sources,
             currentScope = currentScope,
             keepassDatabases = keepassDatabases,

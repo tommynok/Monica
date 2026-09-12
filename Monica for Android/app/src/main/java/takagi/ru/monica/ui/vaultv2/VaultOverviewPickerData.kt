@@ -74,6 +74,7 @@ internal fun prepareOverviewPicker(
     items: List<VaultV2Item>,
     sources: List<VaultOverviewSource>,
     cards: Boolean,
+    priorityIdentities: List<String> = emptyList(),
     decrypt: ((String) -> String)? = null,
     checkActive: () -> Unit = {},
     nativeThreshold: Int = OVERVIEW_PICKER_NATIVE_THRESHOLD,
@@ -82,8 +83,11 @@ internal fun prepareOverviewPicker(
     val sourceByKey = sources.associateBy(VaultOverviewSource::key)
     val sourceIndices = sources.withIndex().associate { it.value.key to it.index }
     val identities = hashSetOf<String>()
-    // Preserve the vault's order; selecting a row must never reorder the picker.
-    val rows = buildList {
+    val priorities = priorityIdentities.toSet()
+    val priorityRows = hashMapOf<String, OverviewPickerEntry>()
+    // Resolve the small priority prefix during preparation. Queries and checkbox
+    // changes can then reuse the same row order and native index without sorting.
+    val remainingRows = buildList {
         items.forEachIndexed { index, item ->
             if (index % 64 == 0) checkActive()
             if ((item.type in overviewCardTypes) != cards) return@forEachIndexed
@@ -112,8 +116,13 @@ internal fun prepareOverviewPicker(
             val text = listOf(item.title, source.name, bank?.bankName.orEmpty(), last4,
                 password?.username.orEmpty(), password?.website.orEmpty(), password?.appName.orEmpty())
                 .joinToString("\u0000").lowercase(Locale.ROOT)
-            add(OverviewPickerEntry(item, identity, sourceKey, sourceIndices.getValue(sourceKey), detail, last4, brand, text))
+            val row = OverviewPickerEntry(item, identity, sourceKey, sourceIndices.getValue(sourceKey), detail, last4, brand, text)
+            if (identity in priorities) priorityRows[identity] = row else add(row)
         }
+    }
+    val rows = if (priorityRows.isEmpty()) remainingRows else buildList(priorityRows.size + remainingRows.size) {
+        priorities.forEach { identity -> priorityRows[identity]?.let { add(it) } }
+        addAll(remainingRows)
     }
     checkActive()
     val handle = if (rows.size in nativeThreshold..100_000) openNative(encodeOverviewPickerMetadata(rows)) else null

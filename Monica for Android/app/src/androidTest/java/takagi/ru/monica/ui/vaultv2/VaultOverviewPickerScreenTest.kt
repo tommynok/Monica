@@ -47,13 +47,15 @@ class VaultOverviewPickerScreenTest {
         pinnedItems = passwords.map { it.overviewIdentity() }))
     private var shown by mutableStateOf(true)
 
-    private fun showPicker(wallet: Boolean, scope: String = "all", dark: Boolean = false) {
+    private fun showPicker(wallet: Boolean, scope: String = "all", dark: Boolean = false,
+        pickerItems: List<VaultV2Item> = cards + passwords, frequentItems: List<VaultV2Item> = emptyList()) {
         val security = SecurityManager(context)
         compose.setContent {
             MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
                 TextButton(onClick = { shown = true }) { Text("Open picker") }
                 if (shown) VaultOverviewPickerSheet(
-                    cards = wallet, items = (cards + passwords).filter { scope == "all" || it.overviewSource() == scope },
+                    cards = wallet, items = pickerItems.filter { scope == "all" || it.overviewSource() == scope },
+                    currentFrequentItems = frequentItems,
                     sources = sources, currentScope = scope,
                     keepassDatabases = listOf(LocalKeePassDatabase(3, "Locked", "locked.kdbx")),
                     mdbxDatabases = listOf(LocalMdbxDatabase(4, "Project MDBX", "project.mdbx")),
@@ -63,6 +65,7 @@ class VaultOverviewPickerScreenTest {
                 )
             }
         }
+        waitForPicker()
     }
 
     @Test fun bankBrandAndTailDistinguishCardsAndSelectionsSurviveDatabaseFilters() {
@@ -151,11 +154,85 @@ class VaultOverviewPickerScreenTest {
         compose.onNodeWithTag("overview_pin_scope").assertDoesNotExist()
         compose.onNodeWithTag("overview_pin_row_bank_card:3").assertDoesNotExist()
         compose.onNodeWithTag("overview_pin_row_bank_card:2").performClick().assertIsOn()
-        compose.runOnIdle { assertEquals(VAULT_OVERVIEW_MAX_PINS, config.pinnedCards.size) }
-        compose.onNodeWithText(context.getString(R.string.vault_overview_picker_limit, VAULT_OVERVIEW_MAX_PINS)).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(200, config.pinnedCards.size) }
+        compose.onNodeWithText(context.getString(R.string.vault_overview_picker_limit, 200)).assertIsDisplayed()
         compose.onNodeWithTag("overview_pin_row_bank_card:1").performClick().assertIsOff().assertIsEnabled()
         compose.onNodeWithTag("overview_pin_row_bank_card:2").assertIsOn()
-        compose.runOnIdle { assertEquals(VAULT_OVERVIEW_MAX_PINS - 1, config.pinnedCards.size) }
+        compose.runOnIdle { assertEquals(199, config.pinnedCards.size) }
+    }
+
+    @Test fun frequentCardsLeadThePickerAndTogglingDoesNotMoveRows() = verifyFrequentOrder(wallet = true)
+
+    @Test fun frequentItemsLeadThePickerAndTogglingDoesNotMoveRows() = verifyFrequentOrder(wallet = false)
+
+    private fun verifyFrequentOrder(wallet: Boolean) {
+        val entries = if (wallet) cards else passwords
+        config = if (wallet) config.copy(pinnedCards = listOf(entries[2].overviewIdentity()))
+            else config.copy(pinnedItems = listOf(entries[2].overviewIdentity()))
+        showPicker(wallet, frequentItems = listOf(entries[2], entries[1]))
+        assertPickerOrder(entries[2], entries[1], entries[0])
+        val last = compose.onNodeWithTag("overview_pin_row_${entries[2].key}")
+        val position = last.fetchSemanticsNode().boundsInRoot
+        last.assertIsOn().performClick().assertIsOff()
+        compose.onNodeWithTag("overview_pin_row_${entries[0].key}").assertIsOff().performClick().assertIsOn()
+        assertEquals(position, last.fetchSemanticsNode().boundsInRoot)
+        assertPickerOrder(entries[2], entries[1], entries[0])
+        compose.onNodeWithTag("overview_pin_done").performClick()
+        compose.onNodeWithText("Open picker").performClick()
+        waitForPicker()
+        assertPickerOrder(entries[0], entries[2], entries[1])
+        capturePicker(if (wallet) "picker-cards-priority.png" else "picker-items-priority.png")
+    }
+
+    @Test fun eightItemLimitIsGlobalAcrossDatabasesAndSearchAndAllowsReplacingASelection() {
+        val entries = buildVaultV2PasswordItems((1L..10L).map { id -> PasswordEntry(
+            id = id, title = "Account $id", username = "demo$id@example.test", password = "", website = "",
+            bitwardenVaultId = if (id > 8) 2 else null, createdAt = Date(10),
+        ) })
+        config = config.copy(pinnedItems = entries.take(8).map { it.overviewIdentity() }, recommendItems = false)
+        showPicker(wallet = false, pickerItems = entries)
+        compose.onNodeWithTag("overview_pin_selected_count")
+            .assertTextEquals(context.getString(R.string.vault_overview_picker_selected, 8))
+        compose.onNodeWithText(context.getString(R.string.vault_overview_picker_limit, 8)).assertIsDisplayed()
+        chooseDatabase("work@example.test")
+        val ninth = compose.onNodeWithTag("overview_pin_row_password:9")
+        ninth.assertIsOff().assertIsNotEnabled()
+        val search = compose.onNodeWithTag("overview_pin_search")
+        search.performTextInput("demo9")
+        search.performImeAction()
+        ninth.assertIsOff().assertIsNotEnabled()
+        compose.onNodeWithTag("overview_pin_row_password:10").assertDoesNotExist()
+        compose.onNodeWithTag("overview_pin_clear").performClick()
+        chooseDatabase(context.getString(R.string.category_selection_menu_local_database))
+        compose.onNodeWithTag("overview_pin_row_password:1").assertIsOn().assertIsEnabled().performClick().assertIsOff()
+        compose.onNodeWithTag("overview_pin_selected_count")
+            .assertTextEquals(context.getString(R.string.vault_overview_picker_selected, 7))
+        chooseDatabase("work@example.test")
+        ninth.assertIsEnabled().performClick().assertIsOn()
+        compose.onNodeWithTag("overview_pin_row_password:10").assertIsOff().assertIsNotEnabled()
+        compose.runOnIdle {
+            assertEquals(8, config.pinnedItems.size)
+            assertTrue(entries[8].overviewIdentity() in config.pinnedItems)
+            assertFalse(entries[0].overviewIdentity() in config.pinnedItems)
+        }
+        capturePicker("picker-items-limit.png")
+        compose.onNodeWithTag("overview_pin_done").performClick()
+        compose.onNodeWithText("Open picker").performClick()
+        waitForPicker()
+        chooseDatabase("work@example.test")
+        ninth.assertIsOn().assertIsEnabled()
+        compose.onNodeWithTag("overview_pin_row_password:10").assertIsNotEnabled()
+    }
+
+    private fun waitForPicker() {
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("overview_pin_results").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    private fun assertPickerOrder(vararg entries: VaultV2Item) {
+        val tops = entries.map { entry ->
+            compose.onNodeWithTag("overview_pin_row_${entry.key}").assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
+        }
+        assertTrue("Expected picker order ${entries.map { it.key }}, got positions $tops", tops.zipWithNext().all { (a, b) -> a < b })
     }
 
     private fun chooseDatabase(label: String) {

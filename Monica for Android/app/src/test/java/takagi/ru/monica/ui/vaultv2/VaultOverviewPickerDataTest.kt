@@ -105,4 +105,30 @@ class VaultOverviewPickerDataTest {
             assertSame(it.rows[0], it.filter("1234", "local").single())
         }
     }
+
+    @Test fun existingFrequentEntriesLeadBothPickersInOrderAcrossSearchAndDatabaseFilters() {
+        val groups = listOf(
+            false to listOf(password(1, "alice"), password(2, "bob"), password(3, "alice-work", vault = 2), password(4, "alice-other")),
+            true to listOf(card(1, "Bank", "4111111111110001"), card(2, "Other", "4111111111110002"),
+                card(3, "Work Bank", "4111111111110003", vault = 2), card(4, "Second Bank", "4111111111110004")),
+        )
+        for ((wallet, items) in groups) {
+            val pinned = items[2].overviewIdentity()
+            val recommended = items[1].overviewIdentity()
+            val priorities = listOf(pinned, "missing", recommended, pinned)
+            var opens = 0
+            prepareOverviewPicker(items + items[2], sources, wallet, priorityIdentities = priorities,
+                nativeThreshold = 0, openNative = { opens++; null }).use { picker ->
+                assertEquals(listOf(items[2], items[1], items[0], items[3]), picker.rows.map { it.item })
+                assertEquals(listOf(items[1], items[0], items[3]), picker.filter("", "local").map { it.item })
+                assertEquals(listOf(items[2]), picker.filter("", "bitwarden:2").map { it.item })
+                repeat(3) {
+                    assertEquals(listOf(items[2], items[0], items[3]),
+                        picker.filter(if (wallet) "BANK" else "ALICE", "all").map { it.item })
+                }
+                assertTrue(picker.filter("", "keepass:3").isEmpty())
+                assertEquals(1, opens)
+            }
+        }
+    }
 }

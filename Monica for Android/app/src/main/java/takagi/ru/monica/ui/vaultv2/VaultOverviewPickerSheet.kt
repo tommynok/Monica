@@ -42,7 +42,8 @@ import kotlinx.coroutines.withContext
 import takagi.ru.monica.R
 import takagi.ru.monica.data.LocalKeePassDatabase
 import takagi.ru.monica.data.LocalMdbxDatabase
-import takagi.ru.monica.data.VAULT_OVERVIEW_MAX_PINS
+import takagi.ru.monica.data.VAULT_OVERVIEW_MAX_CARD_PINS
+import takagi.ru.monica.data.VAULT_OVERVIEW_MAX_ITEM_PINS
 import takagi.ru.monica.data.VaultOverviewConfig
 import takagi.ru.monica.data.bitwarden.BitwardenVault
 import takagi.ru.monica.security.SecurityManager
@@ -57,6 +58,7 @@ import takagi.ru.monica.ui.icons.VaultItemIcon
 internal fun VaultOverviewPickerSheet(
     cards: Boolean,
     items: List<VaultV2Item>,
+    currentFrequentItems: List<VaultV2Item>,
     sources: List<VaultOverviewSource>,
     currentScope: String,
     keepassDatabases: List<LocalKeePassDatabase>,
@@ -73,26 +75,34 @@ internal fun VaultOverviewPickerSheet(
     val sourceByKey = remember(sources) { sources.associateBy(VaultOverviewSource::key) }
     val source = sourceByKey[scope]
     val scopeName = source?.name ?: stringResource(R.string.vault_overview_all_databases)
-    val prepared = rememberOverviewPicker(items, sources, cards, securityManager)
+    val pins = if (cards) config.pinnedCards else config.pinnedItems
+    val maxPins = if (cards) VAULT_OVERVIEW_MAX_CARD_PINS else VAULT_OVERVIEW_MAX_ITEM_PINS
+    // Capture the opening order so selecting or removing a pin never moves the
+    // row under the user's finger. Reopening reflects the updated selection.
+    val priorityIdentities = rememberSaveable(cards, currentScope) {
+        (pins + currentFrequentItems.map { it.overviewIdentity() }).distinct()
+    }
+    val prepared = rememberOverviewPicker(items, sources, cards, priorityIdentities, securityManager)
     val candidatesState = remember(prepared, query, scope) { mutableStateOf<List<OverviewPickerEntry>?>(null) }
     LaunchedEffect(candidatesState) {
         candidatesState.value = withContext(Dispatchers.Default) { prepared?.filter(query, scope) }
     }
     val candidates = candidatesState.value
-    val pins = if (cards) config.pinnedCards else config.pinnedItems
     val selected = remember(pins) { pins.toHashSet() }
     val recommend = if (cards) config.recommendCards else config.recommendItems
     val listState = rememberLazyListState()
     LaunchedEffect(query, scope) { listState.scrollToItem(0) }
     val toggle: (String) -> Unit = { key ->
         onConfigChange { old ->
-            val existing = if (cards) old.pinnedCards else old.pinnedItems
-            val next = when {
-                key in existing -> existing - key
-                existing.size < VAULT_OVERVIEW_MAX_PINS -> existing + key
-                else -> existing
-            }
-            if (cards) old.copy(pinnedCards = next) else old.togglePinnedItem(key)
+            if (cards) {
+                val existing = old.pinnedCards
+                val next = when {
+                    key in existing -> existing - key
+                    existing.size < maxPins -> existing + key
+                    else -> existing
+                }
+                old.copy(pinnedCards = next)
+            } else old.togglePinnedItem(key)
         }
     }
     val setRecommend: (Boolean) -> Unit = { checked ->
@@ -215,7 +225,7 @@ internal fun VaultOverviewPickerSheet(
                     else -> itemsIndexed(candidates, key = { _, row -> row.identity }, contentType = { _, _ -> "entry" }) { index, row ->
                         val checked = row.identity in selected
                         OverviewPickerRow(row, sourceByKey[row.source]?.name.takeIf { currentScope == "all" }, checked,
-                            enabled = checked || selected.size < VAULT_OVERVIEW_MAX_PINS,
+                            enabled = checked || selected.size < maxPins,
                             shape = GroupedItemDefaults.shape(index, candidates.size), onToggle = { toggle(row.identity) })
                     }
                 }
@@ -227,8 +237,8 @@ internal fun VaultOverviewPickerSheet(
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(R.string.vault_overview_picker_selected, selected.size), style = MaterialTheme.typography.titleSmall,
                             modifier = Modifier.testTag("overview_pin_selected_count"))
-                        if (selected.size >= VAULT_OVERVIEW_MAX_PINS) Text(
-                            stringResource(R.string.vault_overview_picker_limit, VAULT_OVERVIEW_MAX_PINS),
+                        if (!cards || selected.size >= maxPins) Text(
+                            stringResource(R.string.vault_overview_picker_limit, maxPins),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -291,8 +301,8 @@ private fun OverviewPickerRow(row: OverviewPickerEntry, sourceName: String?, che
 
 @Composable
 private fun rememberOverviewPicker(items: List<VaultV2Item>, sources: List<VaultOverviewSource>, cards: Boolean,
-    securityManager: SecurityManager): PreparedOverviewPicker? {
-    val state = remember(items, sources, cards, securityManager) { mutableStateOf<PreparedOverviewPicker?>(null) }
+    priorityIdentities: List<String>, securityManager: SecurityManager): PreparedOverviewPicker? {
+    val state = remember(items, sources, cards, priorityIdentities, securityManager) { mutableStateOf<PreparedOverviewPicker?>(null) }
     LaunchedEffect(state) {
         var prepared: PreparedOverviewPicker? = null
         try {
@@ -300,7 +310,8 @@ private fun rememberOverviewPicker(items: List<VaultV2Item>, sources: List<Vault
                 val context = currentCoroutineContext()
                 // Assign inside the worker block: even cancellation at the return
                 // dispatch cannot lose a newly allocated native handle.
-                prepared = prepareOverviewPicker(items, sources, cards, securityManager::decryptDataIfMonicaCiphertext,
+                prepared = prepareOverviewPicker(items, sources, cards, priorityIdentities,
+                    decrypt = securityManager::decryptDataIfMonicaCiphertext,
                     checkActive = { context.ensureActive() })
             }
             state.value = prepared

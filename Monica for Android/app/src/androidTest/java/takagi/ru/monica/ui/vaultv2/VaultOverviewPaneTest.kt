@@ -278,13 +278,13 @@ class VaultOverviewPaneTest {
         assertFalse(runBlocking { settings.settingsFlow.first().vaultOverviewConfig.excludedFrequentItems.contains(entry.vaultOverviewKey()) })
     }
 
-    @Test fun overviewBulkRemovalOnlyTouchesTheVisibleFrequentPreview() {
-        showSelectableOverview(pinCount = 24)
+    @Test fun overviewBulkRemovalOnlyTouchesTheEightFrequentItems() {
+        showSelectableOverview(pinCount = 8)
         overviewRow("items", 1).performTouchInput { longClick() }
         compose.onNodeWithContentDescription(context.getString(R.string.select_all)).performClick()
         compose.runOnIdle { assertEquals(8, state.selectionCount) }
         compose.onNodeWithContentDescription(context.getString(R.string.vault_overview_remove_frequent_items)).performClick()
-        compose.waitUntil(10_000) { state.overviewSnapshot?.frequentItems?.firstOrNull()?.key == "password:9" }
+        compose.waitUntil(10_000) { state.overviewSnapshot?.frequentItems?.isEmpty() == true }
         compose.runOnIdle {
             assertEquals(0, state.selectionCount)
             assertEquals(24, state.overviewSnapshot?.items?.size)
@@ -292,7 +292,7 @@ class VaultOverviewPaneTest {
         }
         val saved = runBlocking { settings.settingsFlow.first().vaultOverviewConfig }
         assertEquals(8, saved.excludedFrequentItems.size)
-        assertEquals(16, saved.pinnedItems.size)
+        assertTrue(saved.pinnedItems.isEmpty())
         runBlocking {
             (1L..24L).forEach { assertFalse(database.passwordEntryDao().getPasswordEntryById(it)!!.isDeleted) }
         }

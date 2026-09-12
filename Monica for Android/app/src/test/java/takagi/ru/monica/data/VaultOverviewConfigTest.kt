@@ -1,6 +1,8 @@
 package takagi.ru.monica.data
 
 import java.util.Date
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -53,8 +55,28 @@ class VaultOverviewConfigTest {
         val restored = VaultOverviewConfig.decode(removed.togglePinnedItem("one").encode())
         assertEquals(listOf("one"), restored.pinnedItems)
         assertEquals(setOf("two"), restored.excludedFrequentItems)
-        val full = removed.copy(pinnedItems = List(VAULT_OVERVIEW_MAX_PINS) { "pin$it" })
+        val full = removed.copy(pinnedItems = List(8) { "pin$it" })
         assertEquals(full, full.togglePinnedItem("two"))
+        val replaced = full.togglePinnedItem("pin0").togglePinnedItem("two")
+        assertEquals(8, replaced.pinnedItems.size)
+        assertTrue("two" in replaced.pinnedItems)
+        assertFalse("pin0" in replaced.pinnedItems)
+        assertEquals(setOf("one"), replaced.excludedFrequentItems)
+    }
+
+    @Test fun legacyItemPinsKeepTheFirstEightWhileCardsRetainTheirIndependentLimit() {
+        val legacy = VaultOverviewConfig(
+            pinnedItems = listOf("", "pin1") + (1..12).map { "pin$it" },
+            pinnedCards = List(205) { "card$it" },
+            excludedFrequentItems = setOf("pin1", "pin9", "excluded"),
+        )
+        // Serialize without encode(), as an older app could save more than eight.
+        val restored = VaultOverviewConfig.decode(Json.encodeToString(legacy))
+        assertEquals((1..8).map { "pin$it" }, restored.pinnedItems)
+        assertEquals(legacy.pinnedCards.take(200), restored.pinnedCards)
+        assertEquals(setOf("pin9", "excluded"), restored.excludedFrequentItems)
+        assertEquals(restored, VaultOverviewConfig.decode(restored.encode()))
+        assertEquals(restored, restored.togglePinnedItem("pin9"))
     }
 
     @Test fun identitiesSeparateDatabasesTypesAndReusedLocalIdsButSurviveExternalRowRecreation() {

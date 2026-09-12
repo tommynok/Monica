@@ -3,12 +3,14 @@ package takagi.ru.monica.ui.vaultv2
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
+import java.util.Date
 import kotlin.system.measureNanoTime
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import takagi.ru.monica.data.PasswordEntry
 import takagi.ru.monica.rustcore.RustVaultPickerCore
 
 @RunWith(AndroidJUnit4::class)
@@ -55,6 +57,27 @@ class VaultOverviewPickerNativeTest {
             }
         } finally {
             RustVaultPickerCore.close(handle)
+        }
+    }
+
+    @Test fun priorityPrefixKeepsNativeSearchAndDatabaseMappingCorrect() {
+        val items = buildVaultV2PasswordItems((1L..1024L).map { id -> PasswordEntry(
+            id = id, title = "Account $id", username = "user$id@example.test", password = "", website = "",
+            bitwardenVaultId = if (id % 2 == 0L) 2 else null, createdAt = Date(10),
+        ) })
+        val frequent = listOf(items[1023], items[1018], items[511])
+        prepareOverviewPicker(items, listOf(VaultOverviewSource("local", "Personal", "Monica"),
+            VaultOverviewSource("bitwarden:2", "Work", "Bitwarden")), cards = false,
+            priorityIdentities = frequent.map { it.overviewIdentity() }).use { picker ->
+            assertTrue(picker.usesNative)
+            assertEquals(frequent, picker.filter("ACCOUNT", "all").take(3).map { it.item })
+            for (query in listOf("", "  ACCOUNT  ", "user1024@", "101", "missing")) {
+                for (scope in listOf("all", "local", "bitwarden:2", "missing")) {
+                    assertEquals("$query/$scope", picker.filterKotlin(query, scope), picker.filter(query, scope))
+                }
+            }
+            assertEquals(listOf(items.last()), picker.filter("user1024@", "bitwarden:2").map { it.item })
+            assertTrue(picker.filter("user1024@", "local").isEmpty())
         }
     }
 

@@ -4,7 +4,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-internal const val VAULT_OVERVIEW_MAX_PINS = 200
+internal const val VAULT_OVERVIEW_MAX_CARD_PINS = 200
+internal const val VAULT_OVERVIEW_MAX_ITEM_PINS = 8
 
 enum class VaultOverviewModule {
     CARDS, ITEMS, FAVORITES, TYPES, FOLDERS, DATABASES, ARCHIVE, TRASH;
@@ -27,19 +28,21 @@ data class VaultOverviewConfig(
     val scope: String = "local",
     val excludedFrequentItems: Set<String> = emptySet(),
 ) {
-    fun normalized(): VaultOverviewConfig = copy(
-        order = (order + VaultOverviewModule.defaultOrder).distinct()
-            .filter { it in VaultOverviewModule.defaultOrder },
-        hidden = hidden.intersect(VaultOverviewModule.defaultOrder.toSet()),
-        collapsed = collapsed.intersect(VaultOverviewModule.defaultOrder.toSet()),
-        pinnedCards = pinnedCards.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_PINS),
-        pinnedItems = pinnedItems.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_PINS),
-        excludedFrequentItems = excludedFrequentItems.filterTo(linkedSetOf(), String::isNotBlank) -
-            pinnedItems.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_PINS).toSet(),
-        scope = scope.takeIf {
-            it == "all" || it == "local" || (DATABASE_SCOPE.matches(it) && it.substringAfter(':').toLongOrNull() != null)
-        } ?: "local",
-    )
+    fun normalized(): VaultOverviewConfig {
+        val itemPins = pinnedItems.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_ITEM_PINS)
+        return copy(
+            order = (order + VaultOverviewModule.defaultOrder).distinct()
+                .filter { it in VaultOverviewModule.defaultOrder },
+            hidden = hidden.intersect(VaultOverviewModule.defaultOrder.toSet()),
+            collapsed = collapsed.intersect(VaultOverviewModule.defaultOrder.toSet()),
+            pinnedCards = pinnedCards.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_CARD_PINS),
+            pinnedItems = itemPins,
+            excludedFrequentItems = excludedFrequentItems.filterTo(linkedSetOf(), String::isNotBlank) - itemPins.toSet(),
+            scope = scope.takeIf {
+                it == "all" || it == "local" || (DATABASE_SCOPE.matches(it) && it.substringAfter(':').toLongOrNull() != null)
+            } ?: "local",
+        )
+    }
 
     /** Removing a recommendation must survive later opens, syncs and app restarts. */
     fun removeFrequentItems(identities: Collection<String>): VaultOverviewConfig {
@@ -53,7 +56,7 @@ data class VaultOverviewConfig(
     fun togglePinnedItem(identity: String): VaultOverviewConfig = when {
         identity.isBlank() -> this
         identity in pinnedItems -> copy(pinnedItems = pinnedItems - identity)
-        pinnedItems.size >= VAULT_OVERVIEW_MAX_PINS -> this
+        pinnedItems.size >= VAULT_OVERVIEW_MAX_ITEM_PINS -> this
         else -> copy(pinnedItems = pinnedItems + identity, excludedFrequentItems = excludedFrequentItems - identity)
     }
 
