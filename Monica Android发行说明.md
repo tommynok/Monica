@@ -4,6 +4,7 @@
 
 ### 简要
 
+- 感谢 [@tommynok](https://github.com/tommynok) 贡献 [#134](https://github.com/Monica-Pass/Monica/pull/134)：修复导入页面底部操作栏被系统导航栏遮挡的问题，CSV 导入失败提示现已适配全部八种应用语言。
 - 感谢 [@tommynok](https://github.com/tommynok) 贡献 [#131](https://github.com/Monica-Pass/Monica/pull/131)：补全俄语翻译、安全问题本地化，并改善较长文字的布局。
 - 修复 [#128](https://github.com/Monica-Pass/Monica/issues/128)：分组样式选项和 MDBX 管理器随应用语言显示，补全英文、中文和俄语文案，切换语言后及时刷新。
 - 新增卡包卡叠，支持组合收纳与上下翻阅。
@@ -44,6 +45,7 @@
 
 ### Summary
 
+- Thanks to [@tommynok](https://github.com/tommynok) for [#134](https://github.com/Monica-Pass/Monica/pull/134): the import action bar now respects system navigation insets, and CSV import failure messages support all eight app languages.
 - Thanks to [@tommynok](https://github.com/tommynok) for [#131](https://github.com/Monica-Pass/Monica/pull/131): expanded Russian translations, localized security questions, and improved layouts for longer labels.
 - Fixed [#128](https://github.com/Monica-Pass/Monica/issues/128): grouping options and the MDBX manager follow the app language, with English, Chinese, and Russian text that refreshes after language changes.
 - Added wallet card stacks for grouped storage and vertical browsing.
