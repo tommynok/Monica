@@ -3810,6 +3810,7 @@ fun MonicaContent(
                 PasskeyRepository(database.passkeyDao(), mdbxRepository, context.applicationContext)
             }
             val dedupViewModel: DedupEngineViewModel = viewModel {
+                val strings = takagi.ru.monica.utils.AppLocaleStringResolver(context)
                 DedupEngineViewModel(
                     mergeService = DedupMergeService(
                         passwordRepository = repository,
@@ -3819,8 +3820,10 @@ fun MonicaContent(
                         localKeePassDatabaseDao = database.localKeePassDatabaseDao(),
                         localMdbxDatabaseDao = database.localMdbxDatabaseDao(),
                         bitwardenVaultDao = database.bitwardenVaultDao(),
-                        securityManager = securityManager
-                    )
+                        securityManager = securityManager,
+                        strings = strings
+                    ),
+                    strings = strings
                 )
             }
             val uiState by dedupViewModel.uiState.collectAsState()
