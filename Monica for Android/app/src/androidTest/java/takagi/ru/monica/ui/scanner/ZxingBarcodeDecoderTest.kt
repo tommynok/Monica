@@ -18,7 +18,8 @@ class ZxingBarcodeDecoderTest {
         for (payload in listOf(QrScannerFixtures.STEAM, QrScannerFixtures.TOTP)) {
             val frame = QrScannerFixtures.Frame().code(payload)
             for (rotation in listOf(0, 90, 180, 270)) {
-                assertTrue("Payload must remain readable at $rotation degrees", decoder.decodeFrame(frame.proxy(rotation)).orEmpty().contains(payload))
+                val observed = (0 until 6).flatMap { decoder.decodeFrame(frame.proxy(rotation)) }
+                assertTrue("Payload must remain readable at $rotation degrees", observed.contains(payload))
             }
         }
     }
@@ -74,21 +75,27 @@ class ZxingBarcodeDecoderTest {
                 override fun getCropRect() = Rect(700, 100, 1280, 800)
             }
             val decoder = ZxingBarcodeDecoder(listOf(BarcodeFormat.QR_CODE))
-            repeat(4) {
-                assertEquals(listOf(QrScannerFixtures.STEAM), decoder.decodeFrame(proxy))
+            val observed = linkedSetOf<String>()
+            repeat(6) {
+                observed += decoder.decodeFrame(proxy)
                 assertEquals("Decoding must not consume the shared plane buffer", prefix, testBuffer.position())
             }
+            assertEquals(setOf(QrScannerFixtures.STEAM), observed)
         }
     }
 
     @Test fun smallQrStillDecodesAtFullResolutionBesideAnUnrelatedLargeCode() {
-        val decoder = ZxingBarcodeDecoder(listOf(BarcodeFormat.QR_CODE))
-        val frame = QrScannerFixtures.Frame()
-            .code(QrScannerFixtures.UNRELATED, left = 70, top = 290, size = 380)
-            .code(QrScannerFixtures.STEAM, left = 1030, top = 380, size = 45)
-        val observed = (0 until 3).flatMap { decoder.decodeFrame(frame.proxy()) }.toSet()
-        assertTrue(observed.contains(QrScannerFixtures.STEAM))
-        assertTrue(observed.contains(QrScannerFixtures.UNRELATED))
+        for (inverted in listOf(false, true)) {
+            val decoder = ZxingBarcodeDecoder(listOf(BarcodeFormat.QR_CODE))
+            val frame = QrScannerFixtures.Frame()
+                .code(QrScannerFixtures.UNRELATED, left = 70, top = 290, size = 380)
+                // Two pixels per module at full resolution; decimation loses the
+                // repeated finder-pattern observations required by ZXing's multi-reader.
+                .code(QrScannerFixtures.STEAM, left = 1030, top = 380, size = 90, inverted = inverted)
+            val observed = (0 until 6).flatMap { decoder.decodeFrame(frame.proxy()) }.toSet()
+            assertTrue("Small QR must be found during a sweep; inverted=$inverted", observed.contains(QrScannerFixtures.STEAM))
+            assertTrue(observed.contains(QrScannerFixtures.UNRELATED))
+        }
     }
 
     @Test fun cameraAndGalleryRetainAllSupportedBarcodeFormats() {

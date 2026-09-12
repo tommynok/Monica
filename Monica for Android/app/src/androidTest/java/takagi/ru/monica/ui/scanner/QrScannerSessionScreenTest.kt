@@ -36,6 +36,7 @@ import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import org.junit.After
 import org.junit.Assert.*
@@ -163,15 +164,17 @@ class QrScannerSessionScreenTest {
     private fun scanAfterIdle(steam: Boolean) {
         showScanner(steam)
         val feed = feedCamera()
+        feed.useRealCameraPixels.set(InstrumentationRegistry.getArguments().getString("scannerRealFrames") == "true")
         val sessions = diagnostics.count { "event=session_started" in it }
         val idleMs = InstrumentationRegistry.getArguments().getString("scannerIdleMs")?.toLong() ?: 10_000L
         val startedAt = SystemClock.elapsedRealtime()
         waitWithHealthChecks(idleMs)
         assertTrue("Camera must continue delivering empty frames throughout idle", feed.frames.get() >= 10)
         assertEquals("Healthy empty scanning must not restart the camera", sessions, diagnostics.count { "event=session_started" in it })
-        diagnostics += "test_idle duration_ms=${SystemClock.elapsedRealtime() - startedAt} frames=${feed.frames.get()}"
+        diagnostics += "test_idle duration_ms=${SystemClock.elapsedRealtime() - startedAt} frames=${feed.frames.get()} real_frames=${feed.useRealCameraPixels.get()} max_decode_ms=${feed.maxDecodeMs.get()}"
         val payload = if (steam) QrScannerFixtures.STEAM else QrScannerFixtures.TOTP
         feed.fixture.set(QrScannerFixtures.Frame().code(payload))
+        feed.useRealCameraPixels.set(false)
         assertReturned(payload)
     }
 
@@ -221,7 +224,9 @@ class QrScannerSessionScreenTest {
         showScanner()
         val view = requireNotNull(preview())
         val frameClosed = AtomicBoolean(false)
-        val frame = QrScannerFixtures.Frame().code(QrScannerFixtures.STEAM)
+        val frame = QrScannerFixtures.Frame()
+            .code(QrScannerFixtures.STEAM, left = 70, top = 290, size = 380)
+            .code(QrScannerFixtures.STEAM, left = 830, top = 290, size = 380, inverted = true)
         val proxy = object : ImageProxy by frame.proxy() {
             override fun close() { frameClosed.set(true) }
         }
@@ -250,6 +255,8 @@ class QrScannerSessionScreenTest {
         val frames = AtomicInteger()
         val corruptNextFrame = AtomicBoolean(false)
         val corruptFrameClosed = AtomicBoolean(false)
+        val useRealCameraPixels = AtomicBoolean(false)
+        val maxDecodeMs = AtomicLong()
     }
 
     private fun feedCamera(): CameraFeed {
@@ -264,9 +271,10 @@ class QrScannerSessionScreenTest {
             controller.setImageAnalysisAnalyzer(executor) { original ->
                 if (Looper.myLooper() == Looper.getMainLooper()) decodingOnMain.set(true)
                 feed.frames.incrementAndGet()
-                val pixels = feed.fixture.get()
+                val pixels = if (feed.useRealCameraPixels.get()) null else feed.fixture.get()
                 val corrupt = feed.corruptNextFrame.compareAndSet(true, false)
-                val proxy = pixels.replacePixels(original)
+                val proxy = pixels?.replacePixels(original) ?: original
+                val startedAt = SystemClock.elapsedRealtime()
                 delegate.analyze(object : ImageProxy by proxy {
                     override fun getPlanes(): Array<ImageProxy.PlaneProxy> =
                         if (corrupt) emptyArray() else proxy.planes
@@ -274,9 +282,10 @@ class QrScannerSessionScreenTest {
                     override fun close() {
                         proxy.close()
                         if (corrupt) feed.corruptFrameClosed.set(true)
-                        if (pixels !== feed.blank) candidateFrameClosed.set(true)
+                        if (pixels != null && pixels !== feed.blank) candidateFrameClosed.set(true)
                     }
                 })
+                feed.maxDecodeMs.updateAndGet { maxOf(it, SystemClock.elapsedRealtime() - startedAt) }
             }
         }
         return feed

@@ -24,8 +24,8 @@ import java.nio.ByteBuffer
  * ML Kit 有三项隐性能力在替换时容易丢失，这里显式补齐：
  * 1. 反色二维码（暗底亮码，如深色主题下的登录码）——旧 zxing 方案的"正反混合扫描"覆盖的正是这个场景；
  * 2. 远距离小码——在抽稀解码面之外保留全分辨率兜底；
- * 3. 空闲帧的处理成本——复用亮度缓冲，每三帧才执行一次全分辨率深扫，
- *    降低 GC 压力，避免长时间空扫时触发会话的帧停滞恢复。
+ * 3. 空闲帧的处理成本——复用亮度缓冲，每三帧执行一次单极性的全分辨率深扫，
+ *    正反色交替且不叠加抽稀阶梯，降低 GC 压力与单帧峰值。
  */
 internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat>) {
 
@@ -63,7 +63,22 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
         val rotationQuarterTurns =
             ((imageProxy.imageInfo.rotationDegrees % 360) + 360) % 360 / 90
 
-        // 第一级：抽稀解码面（对齐 ML Kit 内部降采样行为），常规尺寸的码在此秒出。
+        frameNumber = (frameNumber + 1) % (SWEEP_INTERVAL * 2)
+        // Full-resolution sweeps also run after unrelated hits. Each sweep replaces
+        // the regular ladder and alternates polarity, so costly attempts cannot pile
+        // up on a single frame and trigger the session's stall watchdog.
+        if (frameNumber % SWEEP_INTERVAL == 0) {
+            fullLuminance = copyLuminance(
+                buffer, origin, width, height, plane.rowStride, plane.pixelStride, 1, fullLuminance
+            )
+            val fullSource = rotated(
+                PlanarYUVLuminanceSource(fullLuminance, width, height, 0, 0, width, height, false),
+                rotationQuarterTurns
+            )
+            return decodeFullResolution(fullSource, inverted = frameNumber == 0)
+        }
+
+        // 常规帧同时检查正反色，保留 Hybrid 与 GlobalHistogram 对不同码制的覆盖。
         val outWidth = (width + DECIMATION - 1) / DECIMATION
         val outHeight = (height + DECIMATION - 1) / DECIMATION
         decimatedLuminance = copyLuminance(
@@ -73,21 +88,7 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
             PlanarYUVLuminanceSource(decimatedLuminance, outWidth, outHeight, 0, 0, outWidth, outHeight, false),
             rotationQuarterTurns
         )
-        val candidates = decodeWithFallback(decimatedSource)
-        frameNumber = (frameNumber + 1) % SWEEP_INTERVAL
-        // Periodically inspect full resolution even after a hit: an unrelated large
-        // code must not permanently hide a smaller code accepted by the caller.
-        if (frameNumber != 0) return candidates
-
-        // 第二级：按作者的分帧方案深扫，空帧也不例外，避免每帧跑满解码阶梯。
-        fullLuminance = copyLuminance(
-            buffer, origin, width, height, plane.rowStride, plane.pixelStride, 1, fullLuminance
-        )
-        val fullSource = rotated(
-            PlanarYUVLuminanceSource(fullLuminance, width, height, 0, 0, width, height, false),
-            rotationQuarterTurns
-        )
-        return (candidates + decodeFullResolution(fullSource)).distinct()
+        return decodeWithFallback(decimatedSource)
     }
 
     /**
@@ -165,9 +166,8 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
     }
 
     /** Full-resolution sweeps only need Hybrid; the decimated path retains GlobalHistogram. */
-    private fun decodeFullResolution(source: LuminanceSource): List<String> =
-        (decode(BinaryBitmap(HybridBinarizer(source))) +
-            decode(BinaryBitmap(HybridBinarizer(source.invert())))).distinct()
+    private fun decodeFullResolution(source: LuminanceSource, inverted: Boolean): List<String> =
+        decode(BinaryBitmap(HybridBinarizer(if (inverted) source.invert() else source)))
 
     private fun rotated(source: LuminanceSource, quarterTurns: Int): LuminanceSource {
         var result = source
