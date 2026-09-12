@@ -2708,7 +2708,7 @@ fun LanguageSelectionDialog(
         onDismissRequest = onDismiss,
         title = { Text(context.getString(R.string.language)) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Language.values().forEach { language ->
                     Row(
                         modifier = Modifier
