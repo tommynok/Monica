@@ -233,7 +233,11 @@ private fun QrCodeScanner(
             diagnostics = diagnostics,
             onCandidates = { candidates, _, _ ->
                 val value = candidates.firstOrNull(currentValidator.value)
-                value?.let(acceptResult)
+                value?.let { accepted ->
+                    // onCandidates 由相机分析线程回调；acceptResult 会写入
+                    // NavController/SavedStateHandle，必须回到主线程执行。
+                    scope.launch { acceptResult(accepted) }
+                }
                 value != null
             },
             onRestartRequested = { reason ->
