@@ -4,11 +4,14 @@ import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -52,6 +55,7 @@ class VaultOverviewPaneTest {
     private var appSettings by mutableStateOf(AppSettings())
     private var openedPassword: Long? = null
     private var darkTheme by mutableStateOf(false)
+    private var keyboardVisible = false
 
     @Before fun prepareVault(): Unit = runBlocking {
         originalSettings = settings.exportPageAdjustmentSettings()
@@ -91,6 +95,8 @@ class VaultOverviewPaneTest {
         val keepass = keep(LocalKeePassViewModel(context.applicationContext as Application, database.localKeePassDatabaseDao(), security))
         val settingsModel = keep(SettingsViewModel(settings))
         compose.setContent {
+            val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+            SideEffect { keyboardVisible = imeVisible }
             LaunchedEffect(settingsModel, followOverviewSettings) {
                 if (followOverviewSettings) settingsModel.settings.collect { persisted ->
                     appSettings = appSettings.copy(vaultOverviewConfig = persisted.vaultOverviewConfig)
@@ -165,7 +171,8 @@ class VaultOverviewPaneTest {
         compose.onNode(hasSetTextAction()).performImeAction()
         compose.onNode(hasSetTextAction()).assertTextEquals("password 24")
         compose.onNodeWithText("Overview password 24").performClick()
-        compose.runOnIdle { assertTrue(state.overviewListOpen); assertEquals(24L, openedPassword) }
+        compose.runOnIdle { assertFalse(state.overviewListOpen); assertEquals(24L, openedPassword) }
+        compose.onNodeWithTag("overview_search_results").assertIsDisplayed()
         compose.onNodeWithContentDescription(context.getString(R.string.topbar_close_search)).performClick()
         compose.onNodeWithTag("overview_top_bar").assertIsDisplayed()
         compose.onNodeWithTag("overview_customize").assertIsDisplayed()
@@ -196,10 +203,12 @@ class VaultOverviewPaneTest {
         compose.onNodeWithTag("vault_item_password:24").performClick()
         compose.runOnIdle { assertNull(openedPassword) }
         compose.onNodeWithText("2").assertIsDisplayed()
+        compose.waitUntil(5_000) { !keyboardVisible }
         Espresso.pressBack()
+        compose.runOnIdle { assertEquals(0, state.selectionCount) }
         compose.onNodeWithContentDescription(context.getString(R.string.select_all)).assertDoesNotExist()
         compose.onNode(hasSetTextAction()).assertTextEquals("password 2")
-        compose.runOnIdle { assertTrue(state.overviewListOpen) }
+        compose.runOnIdle { assertFalse(state.overviewListOpen) }
         compose.onNodeWithTag("vault_item_password:2").performTouchInput { swipeRight() }
         compose.onNodeWithContentDescription(context.getString(R.string.select_all)).assertIsDisplayed()
         Espresso.pressBack()

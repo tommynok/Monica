@@ -4667,4 +4667,6 @@
     <string name="wallet_stack_next">Next card</string>
     <string name="wallet_stack_previous">Previous card</string>
     <string name="wallet_stack_open_card">Open card details</string>
+    <string name="language_french">Français</string>
+    <string name="qs_lang_french">Français</string>
 </resources>

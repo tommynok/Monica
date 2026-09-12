@@ -11,6 +11,10 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import takagi.ru.monica.data.PasswordEntry
+import takagi.ru.monica.data.ItemType
+import takagi.ru.monica.data.SecureItem
+import takagi.ru.monica.data.model.BankCardData
+import takagi.ru.monica.data.model.CardWalletDataCodec
 import takagi.ru.monica.rustcore.RustVaultPickerCore
 
 @RunWith(AndroidJUnit4::class)
@@ -102,5 +106,30 @@ class VaultOverviewPickerNativeTest {
         }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         File(context.getExternalFilesDir("overview-verification"), "vault-picker-performance.json").writeText(results.toString(2))
+    }
+
+    @Test fun overviewSearchUsesTheNativeIndexForMixedItemsAndPreservesDatabaseScope() {
+        val logins = buildVaultV2PasswordItems((1L..1024L).map { id -> PasswordEntry(
+            id = id, title = "Account $id", username = "user$id@example.test", password = "", website = "",
+            bitwardenVaultId = if (id % 2 == 0L) 2 else null,
+        ) })
+        val bank = SecureItem(id = 2048, title = "Everyday card", itemType = ItemType.BANK_CARD,
+            itemData = CardWalletDataCodec.encodeBankCardData(BankCardData(
+                cardNumber = "4111111111115678", bankName = "München Bank",
+                cardholderName = "DEMO", expiryMonth = "09", expiryYear = "2030",
+            )))
+        val card = VaultV2Item("bank_card:2048", VaultV2ItemType.BANK_CARD, bank.title, "", false, "2048",
+            emptyList(), secureItem = bank)
+        prepareOverviewPicker(logins + card, listOf(VaultOverviewSource("local", "Personal", "Monica"),
+            VaultOverviewSource("bitwarden:2", "Work", "Bitwarden")), cards = null).use { index ->
+            assertTrue("The overview must use Rust above the native threshold", index.usesNative)
+            for (query in listOf("", "USER1024@", "MÜNCHEN", "5678", "not-found")) {
+                for (scope in listOf("all", "local", "bitwarden:2", "missing")) {
+                    assertEquals("$query/$scope", index.filterKotlin(query, scope), index.filter(query, scope))
+                }
+            }
+            assertEquals(listOf(card), index.filter("münchen", "local").map { it.item })
+            assertTrue(index.filter("münchen", "bitwarden:2").isEmpty())
+        }
     }
 }

@@ -300,7 +300,7 @@ private fun OverviewPickerRow(row: OverviewPickerEntry, sourceName: String?, che
 }
 
 @Composable
-private fun rememberOverviewPicker(items: List<VaultV2Item>, sources: List<VaultOverviewSource>, cards: Boolean,
+internal fun rememberOverviewPicker(items: List<VaultV2Item>, sources: List<VaultOverviewSource>, cards: Boolean?,
     priorityIdentities: List<String>, securityManager: SecurityManager): PreparedOverviewPicker? {
     val state = remember(items, sources, cards, priorityIdentities, securityManager) { mutableStateOf<PreparedOverviewPicker?>(null) }
     LaunchedEffect(state) {

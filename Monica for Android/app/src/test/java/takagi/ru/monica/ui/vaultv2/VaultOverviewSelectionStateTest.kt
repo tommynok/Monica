@@ -64,4 +64,24 @@ class VaultOverviewSelectionStateTest {
 
     private fun row(index: Int) = VaultV2Item("password:$index", VaultV2ItemType.PASSWORD,
         "Entry $index", "account", true, "$index", emptyList())
+
+    @Test fun searchActionsOnlyUseCurrentResultsAndNeverInheritFrequentRemoval() {
+        val selection = VaultOverviewSelectionState()
+        selection.toggle(VaultOverviewModule.ITEMS, "password:1")
+        selection.updateSearchResults(listOf(row(2), row(3)))
+        assertNull(selection.module)
+        assertTrue(selection.keys.isEmpty())
+        selection.toggleSearch("password:2")
+        selection.selectSearch(listOf("password:2", "password:3", "password:4"))
+        assertEquals(listOf("password:2", "password:3"), selection.keys)
+        assertNull(selection.module)
+        selection.updateSearchResults(listOf(row(3)))
+        assertEquals(listOf("password:3"), selection.keys)
+        selection.clear()
+        assertEquals(listOf(row(3)), selection.searchResults)
+        selection.toggleSearch("password:3")
+        selection.exitSearch()
+        assertTrue(selection.keys.isEmpty())
+        assertNull(selection.searchResults)
+    }
 }

@@ -30,7 +30,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import takagi.ru.monica.R
@@ -88,6 +87,19 @@ internal fun VaultOverviewScreen(
     var showCustomization by rememberSaveable { mutableStateOf(false) }
     var pinModule by rememberSaveable { mutableStateOf<String?>(null) }
     var showAllFolders by rememberSaveable { mutableStateOf(false) }
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchListState = rememberLazyListState()
+    fun setSearchExpanded(expanded: Boolean) {
+        searchExpanded = expanded
+        if (expanded) {
+            selection.clear()
+            onSearch()
+        } else {
+            searchQuery = ""
+            selection.exitSearch()
+        }
+    }
     val sourceByKey = remember(sources) { sources.associateBy(VaultOverviewSource::key) }
     val selectedSource = sourceByKey[currentScope]
     val frequentPreview = snapshot?.selectablePreview(VaultOverviewModule.ITEMS, config).orEmpty()
@@ -121,19 +133,19 @@ internal fun VaultOverviewScreen(
     val density = LocalDensity.current
     val searchTriggerDistance = with(density) { PullSearchDefaults.TriggerDistance.toPx() }
     val pullSearch = rememberPullToSearchState(
-        isSearchExpanded = isDetailVisible || selectionModule != null,
+        isSearchExpanded = searchExpanded || isDetailVisible || cardStackState.expanded || selectionModule != null,
         searchTriggerDistance = searchTriggerDistance,
         maxDragDistance = with(density) { 100.dp.toPx() },
-        onSearchTriggered = onSearch,
+        onSearchTriggered = { setSearchExpanded(true) },
     )
     Column(modifier.fillMaxSize().testTag("vault_overview_screen")) {
         ExpressiveTopBar(
             title = stringResource(R.string.vault_overview_title),
-            // Search belongs to the existing vault list, including its query and Back handling.
-            searchQuery = "",
-            onSearchQueryChange = {},
-            isSearchExpanded = false,
-            onSearchExpandedChange = { expanded -> if (expanded) onSearch() },
+            searchQuery = searchQuery,
+            onSearchQueryChange = { searchQuery = it },
+            isSearchExpanded = searchExpanded,
+            searchBackEnabled = !isDetailVisible && selection.keys.isEmpty(),
+            onSearchExpandedChange = ::setSearchExpanded,
             collapsedTitleEndPadding = 180.dp,
             modifier = Modifier.testTag("overview_top_bar"),
             actions = {
@@ -141,7 +153,7 @@ internal fun VaultOverviewScreen(
                     modifier = Modifier.testTag("overview_scope").semantics { stateDescription = scopeName }) {
                     Icon(Icons.Default.Folder, stringResource(R.string.vault_overview_choose_database))
                 }
-                IconButton(onClick = onSearch, modifier = Modifier.testTag("overview_search")) {
+                IconButton(onClick = { setSearchExpanded(true) }, modifier = Modifier.testTag("overview_search")) {
                     Icon(Icons.Default.Search, stringResource(R.string.search))
                 }
                 Box {
@@ -177,6 +189,15 @@ internal fun VaultOverviewScreen(
             }
         } else if (snapshot == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        } else if (searchExpanded) {
+            VaultOverviewSearchResults(
+                items = snapshot.items, sources = sources, currentScope = currentScope,
+                query = searchQuery, securityManager = securityManager,
+                listState = searchListState, onOpenItem = onOpenItem,
+                selection = selection, isDetailVisible = isDetailVisible,
+                onRequestDeleteItem = onRequestDeleteItem,
+                modifier = Modifier.weight(1f),
+            )
         } else {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 PullSearchHint(currentOffset = pullSearch.currentOffset, triggerDistance = searchTriggerDistance)
@@ -343,16 +364,18 @@ internal fun VaultOverviewScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun OverviewItemRow(
+internal fun OverviewItemRow(
     item: VaultV2Item,
     shape: Shape,
     selected: Boolean,
     selectionMode: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    subtitle: String = item.subtitle,
+    rowTag: String = "overview_item_${item.key}",
 ) {
     ListItem(headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(item.subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingContent = {
             val password = item.passwordEntry
             if (password != null) VaultItemIcon(
@@ -373,10 +396,10 @@ private fun OverviewItemRow(
                 role = if (selectionMode) Role.Checkbox else Role.Button,
                 onClick = onClick,
                 onLongClick = onLongClick,
-                onLongClickLabel = stringResource(R.string.swipe_action_select),
+                onLongClickLabel = if (onLongClick != null) stringResource(R.string.swipe_action_select) else null,
             )
             .semantics { this.selected = selected }
-            .testTag("overview_item_${item.key}"),
+            .testTag(rowTag),
         colors = ListItemDefaults.colors(containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
             else MaterialTheme.colorScheme.surfaceContainerLow))
 }

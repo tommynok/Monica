@@ -21,7 +21,7 @@ internal data class OverviewPickerEntry(
     val searchText: String,
 )
 
-/** Prepared once on a worker, shared by queries and checkbox changes until the sheet closes. */
+/** Prepared once on a worker, shared by search and checkbox changes until the owner closes. */
 internal class PreparedOverviewPicker(
     val rows: List<OverviewPickerEntry>,
     private val sourceIndices: Map<String, Int>,
@@ -73,7 +73,7 @@ internal fun validOverviewPickerIndices(indices: IntArray, rows: List<OverviewPi
 internal fun prepareOverviewPicker(
     items: List<VaultV2Item>,
     sources: List<VaultOverviewSource>,
-    cards: Boolean,
+    cards: Boolean?,
     priorityIdentities: List<String> = emptyList(),
     decrypt: ((String) -> String)? = null,
     checkActive: () -> Unit = {},
@@ -90,7 +90,7 @@ internal fun prepareOverviewPicker(
     val remainingRows = buildList {
         items.forEachIndexed { index, item ->
             if (index % 64 == 0) checkActive()
-            if ((item.type in overviewCardTypes) != cards) return@forEachIndexed
+            if (cards != null && (item.type in overviewCardTypes) != cards) return@forEachIndexed
             val sourceKey = item.overviewSource()
             val source = sourceByKey[sourceKey]?.takeUnless { it.locked } ?: return@forEachIndexed
             val identity = item.overviewIdentity()

@@ -90,6 +90,24 @@ class VaultOverviewPickerDataTest {
         }
     }
 
+    @Test fun overviewSearchIncludesEveryItemTypeWithoutLeakingLockedDatabasesOrSecrets() {
+        val login = password(1, "alice@example.test")
+        val bank = card(2, "Alice Bank", "4111111111111234")
+        val work = password(3, "alice-work", vault = 2)
+        val locked = password(4, "alice-locked").let {
+            it.copy(passwordEntry = it.passwordEntry!!.copy(keepassDatabaseId = 3))
+        }
+        prepareOverviewPicker(listOf(login, bank, work, locked, bank), sources, cards = null,
+            openNative = { null }).use { index ->
+            assertEquals(listOf(login, bank, work), index.filter("alice", "all").map { it.item })
+            assertEquals(listOf(login, bank), index.filter("alice", "local").map { it.item })
+            assertEquals(listOf(work), index.filter("alice", "bitwarden:2").map { it.item })
+            assertTrue(index.filter("alice", "keepass:3").isEmpty())
+            assertTrue(index.filter("private", "all").isEmpty())
+            assertTrue(index.filter("4111111111111234", "all").isEmpty())
+        }
+    }
+
     @Test fun cachedPreparationSurvivesRepeatedQueriesAndNativeUnavailability() {
         var opens = 0
         var decodes = 0

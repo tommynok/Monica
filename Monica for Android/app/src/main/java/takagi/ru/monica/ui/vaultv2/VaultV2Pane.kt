@@ -1625,7 +1625,6 @@ fun VaultV2Pane(
 	val selectedKeys = remember { mutableStateListOf<String>() }
 	val overviewSelection = remember { VaultOverviewSelectionState(selectedKeys) }
 	LaunchedEffect(showOverview) { overviewSelection.clear() }
-	var overviewSearchRoute by rememberSaveable { mutableStateOf(false) }
 	fun resetOverviewFilters() {
 		quickFilterFavorite = false
 		quickFilter2fa = false; quickFilterNotes = false; quickFilterPasskey = false
@@ -1637,14 +1636,12 @@ fun VaultV2Pane(
 		state.overviewItemType = null; state.overviewFavorites = false
 	}
 	fun openOverviewList(selection: UnifiedCategoryFilterSelection = state.toUnifiedCategoryFilterSelection(),
-		type: VaultV2ItemType? = null, favorites: Boolean = false, search: Boolean = false) {
+		type: VaultV2ItemType? = null, favorites: Boolean = false) {
 		resetOverviewFilters()
 		state.overviewListOpen = true
 		state.overviewItemType = type?.name
 		state.overviewFavorites = favorites
 		quickFilterFavorite = favorites
-		overviewSearchRoute = search
-		isSearchExpanded = search
 		state.clearFolderNavigationHistory()
 		state.updateStorageFilter(selection)
 		state.requestScrollToTop()
@@ -1652,7 +1649,6 @@ fun VaultV2Pane(
 	fun closeOverviewList() {
 		if (state.isArchiveView) state.closeArchiveView(scrollToTop = false)
 		resetOverviewFilters()
-		overviewSearchRoute = false
 		state.overviewListOpen = false
 		state.clearFolderNavigationHistory()
 		state.updateStorageFilter(overviewScopeSelection(state.overviewScope ?: appSettings.vaultOverviewConfig.scope))
@@ -1712,7 +1708,7 @@ fun VaultV2Pane(
 		syncTriggerDistance = pullSyncTriggerDistance,
 		maxDragDistance = pullMaxDragDistance,
 		bitwardenRepository = bitwardenRepository,
-		onSearchTriggered = { if (showOverview) openOverviewList(search = true) else isSearchExpanded = true },
+		onSearchTriggered = { isSearchExpanded = true },
 	)
 	val stackCardMode = remember(appSettings.stackCardMode) {
 		runCatching { StackCardMode.valueOf(appSettings.stackCardMode) }.getOrDefault(StackCardMode.AUTO)
@@ -3017,7 +3013,8 @@ fun VaultV2Pane(
 
 	val selectedCount by remember { derivedStateOf { selectedKeys.size } }
 	val selectionCandidates = if (showOverview) {
-		state.overviewSnapshot?.selectablePreview(overviewSelection.module, appSettings.vaultOverviewConfig).orEmpty()
+		overviewSelection.searchResults
+			?: state.overviewSnapshot?.selectablePreview(overviewSelection.module, appSettings.vaultOverviewConfig).orEmpty()
 	} else allItems
 	val selectedItems by remember(selectionCandidates) {
 		derivedStateOf {
@@ -3247,14 +3244,15 @@ fun VaultV2Pane(
 				onArchive = { openOverviewList(); state.openArchiveView() },
 				onTrash = { overviewSelection.clear(); handleOpenTrashPage() },
 				onAllItems = { openOverviewList() },
-				onSearch = { openOverviewList(search = true) },
+				onSearch = { overviewSelection.clear() },
 				onUnlock = {
 					if (selectedBitwardenVaultId != null) showBitwardenUnlockDialog = true
 					else selectedKeePassDatabaseId?.let(localKeePassViewModel::openNativeManager)
 				},
 				selection = overviewSelection,
 				onRequestDeleteItem = { item ->
-					overviewSelection.selectAll(VaultOverviewModule.FAVORITES, listOf(item.key))
+					if (overviewSelection.searchResults != null) overviewSelection.selectSearch(listOf(item.key))
+					else overviewSelection.selectAll(VaultOverviewModule.FAVORITES, listOf(item.key))
 					showDeleteConfirmDialog = true
 				},
 			)
@@ -3273,7 +3271,6 @@ fun VaultV2Pane(
 				searchBackEnabled = selectedCount == 0,
 				onSearchExpandedChange = {
 					isSearchExpanded = it
-					if (!it && overviewSearchRoute) closeOverviewList()
 				},
 				searchHint = stringResource(R.string.topbar_search_hint),
 				actions = {
@@ -4112,7 +4109,9 @@ fun VaultV2Pane(
 				onExit = { selectedKeys.clear() },
 				onSelectAll = {
 					val overviewModule = overviewSelection.module
-					if (showOverview && overviewModule != null) {
+					if (showOverview && overviewSelection.searchResults != null) {
+						overviewSelection.selectSearch(selectionCandidates.map { it.key })
+					} else if (showOverview && overviewModule != null) {
 						overviewSelection.selectAll(overviewModule, selectionCandidates.map { it.key })
 					} else {
 						selectedKeys.clear()

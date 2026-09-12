@@ -1,5 +1,6 @@
 package takagi.ru.monica.ui.vaultv2
 
+import androidx.compose.animation.EnterExitState
 import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
@@ -17,6 +18,7 @@ import takagi.ru.monica.R
 import takagi.ru.monica.data.WalletStack
 import takagi.ru.monica.data.model.CardWalletDataCodec
 import takagi.ru.monica.security.SecurityManager
+import takagi.ru.monica.ui.LocalAnimatedVisibilityScope
 import takagi.ru.monica.ui.cardwallet.*
 
 /** Only the small visible deck is retained, and the vault's security cleanup clears it. */
@@ -103,6 +105,10 @@ internal fun OverviewCards(
 ) {
     val entry = prepared?.entry(selectedCardKey)
     val coroutineScope = rememberCoroutineScope()
+    val navigation = LocalAnimatedVisibilityScope.current?.transition
+    val canMeasureOrigin = !isDetailVisible && (navigation == null ||
+        !navigation.isRunning && navigation.currentState == EnterExitState.Visible &&
+            navigation.targetState == EnterExitState.Visible)
     if (entry == null) {
         Surface(Modifier.fillMaxWidth().aspectRatio(CardFaceImageProcessor.CARD_ASPECT_RATIO),
             shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {}
@@ -122,7 +128,9 @@ internal fun OverviewCards(
             },
             onLongClick = onManage,
             onManage = onManage,
-            onCoverBounds = { state.originBounds = it },
+            // Window coordinates include the page's navigation transform. Keep the
+            // last settled cover bounds while detail navigation moves the page.
+            onCoverBounds = { if (canMeasureOrigin) state.originBounds = it },
             coverVisible = !state.expanded || state.coverRevealed || isDetailVisible && state.hasOpenedDetail,
             controlsVisible = !state.expanded || isDetailVisible && state.hasOpenedDetail,
         )
