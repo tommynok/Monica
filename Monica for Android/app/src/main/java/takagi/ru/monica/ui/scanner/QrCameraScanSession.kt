@@ -2,6 +2,7 @@ package takagi.ru.monica.ui.scanner
 
 import android.content.Context
 import android.os.SystemClock
+import android.util.Log
 import android.util.Size
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
@@ -14,11 +15,6 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
-import com.google.mlkit.vision.barcode.BarcodeScanner
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
 import com.google.zxing.BarcodeFormat
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -29,7 +25,7 @@ internal class QrCameraScanSession(
     context: Context,
     private val lifecycleOwner: LifecycleOwner,
     private val previewView: PreviewView,
-    mlKitFormats: List<Int>,
+    allowedFormats: Collection<BarcodeFormat>,
     private val generation: Int,
     private val diagnostics: QrScannerDiagnostics?,
     private val onCandidates: (List<String>, barcodeCount: Int, durationMs: Long) -> Boolean,
@@ -37,7 +33,8 @@ internal class QrCameraScanSession(
 ) : AutoCloseable {
     private val appContext = context.applicationContext
     private val controller = LifecycleCameraController(appContext)
-    private val scanner: BarcodeScanner = createMlKitBarcodeScanner(mlKitFormats)
+    private val decoder = ZxingBarcodeDecoder(allowedFormats)
+    private val allowedFormatCount = allowedFormats.size
     private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val mainExecutor = ContextCompat.getMainExecutor(appContext)
     private val healthPolicy = QrScanHealthPolicy()
@@ -59,7 +56,8 @@ internal class QrCameraScanSession(
         val startedAt = SystemClock.elapsedRealtime()
         healthPolicy.onSessionStarted(startedAt)
         diagnostics?.logSessionStarted(generation)
-        diagnostics?.logCameraProviderRequested(1)
+        diagnostics?.logCameraControllerRequested(allowedFormatCount)
+        Log.d("qr_scan_perf", "session start gen=$generation")
 
         controller.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
         controller.setImageAnalysisBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -81,7 +79,10 @@ internal class QrCameraScanSession(
 
         runCatching {
             controller.bindToLifecycle(lifecycleOwner)
+        }.onSuccess {
+            Log.d("qr_scan_perf", "bind ok")
         }.onFailure { error ->
+            Log.d("qr_scan_perf", "bind failed", error)
             diagnostics?.logCameraBindFailed(error)
             requestRestart(QrScanRestartReason.FrameStreamStopped)
             return
@@ -92,10 +93,12 @@ internal class QrCameraScanSession(
                 if (!active.get()) return@addListener
                 runCatching { controller.initializationFuture.get() }
                     .onSuccess {
+                        Log.d("qr_scan_perf", "init ok")
                         diagnostics?.logCameraBindSuccess(SystemClock.elapsedRealtime() - startedAt)
                         previewView.post { requestCenterFocus(reason = "session_start") }
                     }
                     .onFailure { error ->
+                        Log.d("qr_scan_perf", "init failed", error)
                         diagnostics?.logCameraProviderFailed(error)
                         requestRestart(QrScanRestartReason.FrameStreamStopped)
                     }
@@ -142,44 +145,32 @@ internal class QrCameraScanSession(
             return
         }
 
-        val frameFinished = AtomicBoolean(false)
-        fun finishFrame(succeeded: Boolean) {
-            if (!frameFinished.compareAndSet(false, true)) return
-            healthPolicy.onFrameCompleted(SystemClock.elapsedRealtime(), succeeded)
-            processingFrame.set(false)
-            runCatching { imageProxy.close() }
-        }
-
-        val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-        val task = runCatching { scanner.process(inputImage) }
-            .onFailure { error ->
-                diagnostics?.logFrameFailure(error)
-                finishFrame(succeeded = false)
-            }
-            .getOrNull()
-            ?: return
-
-        val succeeded = AtomicBoolean(false)
-        task.addOnSuccessListener { barcodes ->
-            succeeded.set(true)
-            val candidates = barcodes
-                .flatMap { it.candidateValues() }
-                .distinct()
-            val durationMs = SystemClock.elapsedRealtime() - frameStartedAt
-            val matched = runCatching {
-                onCandidates(candidates, barcodes.size, durationMs)
-            }.getOrDefault(false)
-            diagnostics?.logFrameSuccess(
-                durationMs = durationMs,
-                barcodeCount = barcodes.size,
-                candidateCount = candidates.size,
-                matched = matched
-            )
-        }.addOnFailureListener { error ->
+        val text = try {
+            decoder.decodeFrame(imageProxy)
+        } catch (error: Throwable) {
+            Log.d("qr_scan_perf", "decode error", error)
             diagnostics?.logFrameFailure(error)
-        }.addOnCompleteListener {
-            finishFrame(succeeded.get())
+            healthPolicy.onFrameCompleted(SystemClock.elapsedRealtime(), succeeded = false)
+            processingFrame.set(false)
+            imageProxy.close()
+            return
         }
+
+        val candidates = listOfNotNull(text)
+        val durationMs = SystemClock.elapsedRealtime() - frameStartedAt
+        Log.d("qr_scan_perf", "frame decode_ms=$durationMs hit=${text != null}")
+        val matched = runCatching {
+            onCandidates(candidates, candidates.size, durationMs)
+        }.getOrDefault(false)
+        diagnostics?.logFrameSuccess(
+            durationMs = durationMs,
+            barcodeCount = candidates.size,
+            candidateCount = candidates.size,
+            matched = matched
+        )
+        healthPolicy.onFrameCompleted(SystemClock.elapsedRealtime(), succeeded = true)
+        processingFrame.set(false)
+        imageProxy.close()
     }
 
     private fun requestCenterFocus(reason: String): Boolean {
@@ -211,12 +202,14 @@ internal class QrCameraScanSession(
 
     private fun requestRestart(reason: QrScanRestartReason) {
         if (!active.compareAndSet(true, false)) return
+        Log.d("qr_scan_perf", "restart requested reason=$reason")
         diagnostics?.logSessionRestartRequested(reason)
         closeResources()
         mainExecutor.execute { onRestartRequested(reason) }
     }
 
     override fun close() {
+        Log.d("qr_scan_perf", "close()")
         active.set(false)
         closeResources()
     }
@@ -229,7 +222,6 @@ internal class QrCameraScanSession(
         runCatching { controller.clearImageAnalysisAnalyzer() }
         runCatching { previewView.controller = null }
         runCatching { controller.unbind() }
-        runCatching { scanner.close() }
         analysisExecutor.shutdown()
     }
 
@@ -238,47 +230,5 @@ internal class QrCameraScanSession(
         private const val ANALYSIS_HEIGHT = 960
         private const val FOCUS_POINT_SIZE = 0.24f
         private const val FOCUS_AUTO_CANCEL_SECONDS = 3L
-    }
-}
-
-internal fun Collection<BarcodeFormat>.toMlKitFormatList(): List<Int> {
-    val mapped = mapNotNull { format ->
-        when (format) {
-            BarcodeFormat.QR_CODE -> Barcode.FORMAT_QR_CODE
-            BarcodeFormat.CODE_128 -> Barcode.FORMAT_CODE_128
-            BarcodeFormat.CODE_39 -> Barcode.FORMAT_CODE_39
-            BarcodeFormat.CODE_93 -> Barcode.FORMAT_CODE_93
-            BarcodeFormat.EAN_13 -> Barcode.FORMAT_EAN_13
-            BarcodeFormat.EAN_8 -> Barcode.FORMAT_EAN_8
-            BarcodeFormat.UPC_A -> Barcode.FORMAT_UPC_A
-            BarcodeFormat.UPC_E -> Barcode.FORMAT_UPC_E
-            BarcodeFormat.ITF -> Barcode.FORMAT_ITF
-            BarcodeFormat.CODABAR -> Barcode.FORMAT_CODABAR
-            BarcodeFormat.DATA_MATRIX -> Barcode.FORMAT_DATA_MATRIX
-            BarcodeFormat.AZTEC -> Barcode.FORMAT_AZTEC
-            BarcodeFormat.PDF_417 -> Barcode.FORMAT_PDF417
-            else -> null
-        }
-    }.distinct()
-    return mapped.ifEmpty { listOf(Barcode.FORMAT_ALL_FORMATS) }
-}
-
-internal fun createMlKitBarcodeScanner(formats: List<Int>): BarcodeScanner {
-    val builder = BarcodeScannerOptions.Builder()
-    if (formats.size == 1) {
-        builder.setBarcodeFormats(formats.first())
-    } else {
-        builder.setBarcodeFormats(formats.first(), *formats.drop(1).toIntArray())
-    }
-    return BarcodeScanning.getClient(builder.build())
-}
-
-internal fun Barcode.candidateValues(): List<String> {
-    return listOfNotNull(
-        rawValue,
-        displayValue,
-        url?.url
-    ).mapNotNull { value ->
-        value.trim().takeIf(String::isNotBlank)
     }
 }

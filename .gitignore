@@ -36,6 +36,9 @@ Monica for Android/.gradle/
 Monica for Android/app/build/
 Monica for Android/build/
 
+# Rust build outputs
+**/target/
+
 # User specific
 *.user
 *.suo
@@ -66,6 +69,7 @@ Monica for Android/build_log.txt
 .claude/
 .codex/
 .codex-tasks/
+.zcode/
 
 # Exclude attached folders
 KeePassDX-master/

@@ -2,6 +2,8 @@ package takagi.ru.monica.ui.screens
 
 import android.Manifest
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.SystemClock
 import android.widget.Toast
@@ -37,17 +39,16 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.google.mlkit.vision.barcode.BarcodeScanner
-import com.google.mlkit.vision.common.InputImage
 import com.google.zxing.BarcodeFormat
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import takagi.ru.monica.R
 import takagi.ru.monica.ui.scanner.QrCameraScanSession
 import takagi.ru.monica.ui.scanner.QrScanRestartReason
 import takagi.ru.monica.ui.scanner.QrScannerDiagnostics
-import takagi.ru.monica.ui.scanner.candidateValues
-import takagi.ru.monica.ui.scanner.createMlKitBarcodeScanner
-import takagi.ru.monica.ui.scanner.toMlKitFormatList
+import takagi.ru.monica.ui.scanner.ZxingBarcodeDecoder
 import java.util.concurrent.atomic.AtomicBoolean
 
 private val DEFAULT_SCANNER_FORMATS = listOf(
@@ -184,8 +185,8 @@ private fun QrCodeScanner(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val mlKitFormats = remember(allowedFormats) { allowedFormats.toMlKitFormatList() }
-    val galleryScanner = remember(mlKitFormats) { createMlKitBarcodeScanner(mlKitFormats) }
+    val galleryDecoder = remember(allowedFormats) { ZxingBarcodeDecoder(allowedFormats) }
+    val scope = rememberCoroutineScope()
     val scanConsumed = remember { AtomicBoolean(false) }
     val diagnostics = remember(diagnosticLabel, onDiagnostic) {
         if (diagnosticLabel != null && onDiagnostic != null) {
@@ -219,7 +220,7 @@ private fun QrCodeScanner(
         context,
         lifecycleOwner,
         previewView,
-        mlKitFormats,
+        allowedFormats,
         scanGeneration,
         diagnostics
     ) {
@@ -227,7 +228,7 @@ private fun QrCodeScanner(
             context = context,
             lifecycleOwner = lifecycleOwner,
             previewView = previewView,
-            mlKitFormats = mlKitFormats,
+            allowedFormats = allowedFormats,
             generation = scanGeneration,
             diagnostics = diagnostics,
             onCandidates = { candidates, _, _ ->
@@ -250,29 +251,27 @@ private fun QrCodeScanner(
     ) { uri ->
         if (uri != null) {
             diagnostics?.logGalleryStart()
-            processImageWithMlKit(
-                context = context,
-                uri = uri,
-                scanner = galleryScanner,
-                diagnostics = diagnostics,
-                resultValidator = currentValidator.value,
-                onResult = acceptResult,
-                onInvalid = {
-                    Toast.makeText(
-                        context,
-                        currentInvalidResultMessage.value ?: context.getString(R.string.qr_not_found),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                },
-                onNotFound = {
-                    Toast.makeText(context, context.getString(R.string.qr_not_found), Toast.LENGTH_SHORT).show()
-                }
-            )
+            scope.launch {
+                processImageWithZxing(
+                    context = context,
+                    uri = uri,
+                    decoder = galleryDecoder,
+                    diagnostics = diagnostics,
+                    resultValidator = currentValidator.value,
+                    onResult = acceptResult,
+                    onInvalid = {
+                        Toast.makeText(
+                            context,
+                            currentInvalidResultMessage.value ?: context.getString(R.string.qr_not_found),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    onNotFound = {
+                        Toast.makeText(context, context.getString(R.string.qr_not_found), Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
         }
-    }
-
-    DisposableEffect(galleryScanner) {
-        onDispose { runCatching { galleryScanner.close() } }
     }
 
     DisposableEffect(cameraSession) {
@@ -297,8 +296,7 @@ private fun QrCodeScanner(
     LaunchedEffect(diagnostics) {
         val activeDiagnostics = diagnostics ?: return@LaunchedEffect
         activeDiagnostics.logScannerStarted(
-            requestedFormats = allowedFormats.size,
-            mlKitFormats = mlKitFormats.size
+            requestedFormats = allowedFormats.size
         )
         while (!scanConsumed.get()) {
             delay(QR_SCAN_DIAG_HEARTBEAT_MS)
@@ -547,10 +545,10 @@ private fun ScannerCorner(
     }
 }
 
-private fun processImageWithMlKit(
+private suspend fun processImageWithZxing(
     context: Context,
     uri: Uri,
-    scanner: BarcodeScanner,
+    decoder: ZxingBarcodeDecoder,
     diagnostics: QrScannerDiagnostics?,
     resultValidator: (String) -> Boolean,
     onResult: (String) -> Unit,
@@ -558,58 +556,79 @@ private fun processImageWithMlKit(
     onNotFound: () -> Unit
 ) {
     val startedAt = SystemClock.elapsedRealtime()
-    val image = runCatching { InputImage.fromFilePath(context, uri) }
-        .getOrElse {
-            diagnostics?.logGalleryDecodeFailed(it)
-            onNotFound()
-            return
-        }
+    val bitmap = withContext(Dispatchers.IO) { loadDownsampledBitmap(context, uri) }
+    if (bitmap == null) {
+        diagnostics?.logGalleryDecodeFailed(IllegalStateException("bitmap_decode_failed"))
+        onNotFound()
+        return
+    }
 
-    scanner.process(image)
-        .addOnSuccessListener { barcodes ->
-            val candidates = barcodes
-                .flatMap { it.candidateValues() }
-                .distinct()
-            when (val value = candidates.firstOrNull(resultValidator)) {
-                null -> {
-                    if (candidates.isEmpty()) {
-                        diagnostics?.logGalleryResult(
-                            durationMs = SystemClock.elapsedRealtime() - startedAt,
-                            barcodeCount = barcodes.size,
-                            candidateCount = candidates.size,
-                            matched = false,
-                            invalid = false
-                        )
-                        onNotFound()
-                    } else {
-                        diagnostics?.logGalleryResult(
-                            durationMs = SystemClock.elapsedRealtime() - startedAt,
-                            barcodeCount = barcodes.size,
-                            candidateCount = candidates.size,
-                            matched = false,
-                            invalid = true
-                        )
-                        onInvalid()
-                    }
-                }
-                else -> {
-                    diagnostics?.logGalleryResult(
-                        durationMs = SystemClock.elapsedRealtime() - startedAt,
-                        barcodeCount = barcodes.size,
-                        candidateCount = candidates.size,
-                        matched = true,
-                        invalid = false
-                    )
-                    onResult(value)
-                }
+    val decoded = try {
+        withContext(Dispatchers.IO) { decoder.decodeBitmap(bitmap) }
+    } catch (error: Throwable) {
+        diagnostics?.logGalleryScanFailed(error)
+        onNotFound()
+        return
+    }
+
+    val candidates = listOfNotNull(decoded)
+    when (val value = candidates.firstOrNull(resultValidator)) {
+        null -> {
+            if (candidates.isEmpty()) {
+                diagnostics?.logGalleryResult(
+                    durationMs = SystemClock.elapsedRealtime() - startedAt,
+                    barcodeCount = candidates.size,
+                    candidateCount = candidates.size,
+                    matched = false,
+                    invalid = false
+                )
+                onNotFound()
+            } else {
+                diagnostics?.logGalleryResult(
+                    durationMs = SystemClock.elapsedRealtime() - startedAt,
+                    barcodeCount = candidates.size,
+                    candidateCount = candidates.size,
+                    matched = false,
+                    invalid = true
+                )
+                onInvalid()
             }
         }
-        .addOnFailureListener {
-            diagnostics?.logGalleryScanFailed(it)
-            onNotFound()
+        else -> {
+            diagnostics?.logGalleryResult(
+                durationMs = SystemClock.elapsedRealtime() - startedAt,
+                barcodeCount = candidates.size,
+                candidateCount = candidates.size,
+                matched = true,
+                invalid = false
+            )
+            onResult(value)
         }
+    }
+}
+
+private fun loadDownsampledBitmap(context: Context, uri: Uri): Bitmap? {
+    return runCatching {
+        val resolver = context.contentResolver
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream, null, bounds)
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            return null
+        }
+        var sampleSize = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sampleSize > GALLERY_MAX_DIMENSION) {
+            sampleSize *= 2
+        }
+        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        resolver.openInputStream(uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream, null, options)
+        }
+    }.getOrNull()
 }
 
 private const val QR_SCAN_DIAG_HEARTBEAT_MS = 30_000L
 private const val QR_SCAN_HEALTH_TICK_MS = 500L
 private const val QR_SCAN_SESSION_RESTART_DELAY_MS = 450L
+private const val GALLERY_MAX_DIMENSION = 2048
