@@ -113,6 +113,7 @@ import takagi.ru.monica.bitwarden.ui.UnlockVaultDialog
 import takagi.ru.monica.bitwarden.viewmodel.BitwardenViewModel
 import takagi.ru.monica.data.AppSettings
 import takagi.ru.monica.data.CategorySelectionUiMode
+import takagi.ru.monica.data.VaultOverviewModule
 import takagi.ru.monica.data.Category
 import takagi.ru.monica.data.LocalKeePassDatabase
 import takagi.ru.monica.data.LocalMdbxDatabase
@@ -1622,6 +1623,8 @@ fun VaultV2Pane(
 		mutableStateOf(emptySet())
 	}
 	val selectedKeys = remember { mutableStateListOf<String>() }
+	val overviewSelection = remember { VaultOverviewSelectionState(selectedKeys) }
+	LaunchedEffect(showOverview) { overviewSelection.clear() }
 	var overviewSearchRoute by rememberSaveable { mutableStateOf(false) }
 	fun resetOverviewFilters() {
 		quickFilterFavorite = false
@@ -3013,10 +3016,13 @@ fun VaultV2Pane(
 	val showVaultLoadingIndicator = !hasDisplayedContent && isVaultListLoading
 
 	val selectedCount by remember { derivedStateOf { selectedKeys.size } }
-	val selectedItems by remember(allItems) {
+	val selectionCandidates = if (showOverview) {
+		state.overviewSnapshot?.selectablePreview(overviewSelection.module, appSettings.vaultOverviewConfig).orEmpty()
+	} else allItems
+	val selectedItems by remember(selectionCandidates) {
 		derivedStateOf {
 			val keySet = selectedKeys.toSet()
-			allItems.filter { it.key in keySet }
+			selectionCandidates.filter { it.key in keySet }
 		}
 	}
 	val currentSectionIndicatorLabel by remember(
@@ -3046,11 +3052,12 @@ fun VaultV2Pane(
 
 	LaunchedEffect(selectedCount) {
 		state.updateSelectionCount(selectedCount)
+		if (selectedCount == 0) showDeleteConfirmDialog = false
 	}
 
 	LaunchedEffect(showBackToTop, selectedCount, showOverview, overviewListState) {
 		if (showOverview) snapshotFlow { overviewListState.firstVisibleItemIndex > 3 }
-			.collect { state.showBackToTop = it }
+			.collect { state.showBackToTop = it && selectedCount == 0 }
 		else state.showBackToTop = showBackToTop && selectedCount == 0
 	}
 
@@ -3215,6 +3222,7 @@ fun VaultV2Pane(
 				retainedSnapshot = state.overviewSnapshot,
 				onSnapshotReady = { state.overviewSnapshot = it },
 				onSelectScope = { selectedScope ->
+					overviewSelection.clear()
 					state.overviewScope = selectedScope
 					state.overviewCardKey = null
 					state.overviewCardStack.clear()
@@ -3237,12 +3245,17 @@ fun VaultV2Pane(
 				onOpenFolder = { openOverviewList(selection = it.target) },
 				onFavorites = { openOverviewList(favorites = true) },
 				onArchive = { openOverviewList(); state.openArchiveView() },
-				onTrash = handleOpenTrashPage,
+				onTrash = { overviewSelection.clear(); handleOpenTrashPage() },
 				onAllItems = { openOverviewList() },
 				onSearch = { openOverviewList(search = true) },
 				onUnlock = {
 					if (selectedBitwardenVaultId != null) showBitwardenUnlockDialog = true
 					else selectedKeePassDatabaseId?.let(localKeePassViewModel::openNativeManager)
+				},
+				selection = overviewSelection,
+				onRequestDeleteItem = { item ->
+					overviewSelection.selectAll(VaultOverviewModule.FAVORITES, listOf(item.key))
+					showDeleteConfirmDialog = true
 				},
 			)
 		} else {
@@ -4098,8 +4111,13 @@ fun VaultV2Pane(
 				selectedCount = selectedCount,
 				onExit = { selectedKeys.clear() },
 				onSelectAll = {
-					selectedKeys.clear()
-					selectedKeys.addAll(filteredItems.map { it.key })
+					val overviewModule = overviewSelection.module
+					if (showOverview && overviewModule != null) {
+						overviewSelection.selectAll(overviewModule, selectionCandidates.map { it.key })
+					} else {
+						selectedKeys.clear()
+						selectedKeys.addAll(filteredItems.map { it.key })
+					}
 				},
 				onMoveToCategory = { showVaultMoveSheet = true },
 				onFavorite = {
@@ -4160,10 +4178,15 @@ fun VaultV2Pane(
 						selectedKeys.clear()
 					}
 				},
-				onDelete = {
+				onRemoveFromFrequent = if (showOverview && overviewSelection.module == VaultOverviewModule.ITEMS) ({
+					val identities = selectedItems.map { it.overviewIdentity() }
+					settingsViewModel.updateVaultOverviewConfig { it.removeFrequentItems(identities) }
+					overviewSelection.clear()
+				}) else null,
+				onDelete = if (showOverview && overviewSelection.module == VaultOverviewModule.ITEMS) null else ({
 					// 先弹确认对话框，不直接删除
 					showDeleteConfirmDialog = true
-				},
+				}),
 			)
 
 			// 删除二次确认对话框（带指纹/密码验证）

@@ -108,6 +108,36 @@ class VaultOverviewProjectionTest {
         assertNull(decodeVaultOverviewAggregation(intArrayOf(2, 0, 0, 0, 0), metadata))
     }
 
+    @Test fun removalSuppressesAutomaticRecommendationsButPreservesFavoritesCountsAndOtherDatabases() {
+        val local = password(1, favorite = true)
+        val remote = password(1, vault = 2, favorite = true)
+        val card = secure(2, VaultV2ItemType.BANK_CARD, favorite = true)
+        val rows = listOf(local, remote, card)
+        val usage = rows.associate { it.overviewIdentity() to VaultOverviewUsage(it.overviewIdentity(), 500, 9999) }
+        val config = VaultOverviewConfig(pinnedItems = listOf(local.overviewIdentity()))
+            .removeFrequentItems(listOf(local.overviewIdentity()))
+        val snapshot = project(rows, scope = "all", config = VaultOverviewConfig.decode(config.encode()), usage = usage)
+        assertEquals(listOf(remote), snapshot.frequentItems)
+        assertEquals(rows, snapshot.items)
+        assertEquals(rows, snapshot.favorites)
+        assertEquals(listOf(card), snapshot.cards)
+        assertEquals(2, snapshot.typeCounts[VaultV2ItemType.PASSWORD])
+        assertEquals(2, snapshot.sourceCounts["local"])
+        assertEquals(listOf(local, remote), project(rows, scope = "all", usage = usage,
+            config = config.togglePinnedItem(local.overviewIdentity())).frequentItems)
+    }
+
+    @Test fun removedItemsCannotReturnThroughLegacyPasswordUsage() {
+        val row = password(1, favorite = true)
+        val config = VaultOverviewConfig().removeFrequentItems(listOf(row.overviewIdentity()))
+        val snapshot = buildVaultOverviewSnapshot(listOf(row), sources, "local", config, emptyMap(),
+            mapOf(1L to PasswordQuickAccessRecord(passwordId = 1, openCount = 100, lastOpenedAt = 9999)),
+            emptyList(), emptyList(), emptyMap(), emptyList(), aggregate = ::aggregateVaultOverviewKotlin)
+        assertTrue(snapshot.frequentItems.isEmpty())
+        assertEquals(listOf(row), snapshot.favorites)
+        assertEquals(listOf(row), snapshot.items)
+    }
+
     @Test fun repeatedScopeChangesReuseAnImmutablePreparedBatch() {
         val local = password(1)
         val work = password(2, vault = 2)

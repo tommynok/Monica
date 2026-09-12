@@ -92,7 +92,7 @@ internal fun VaultOverviewPickerSheet(
                 existing.size < VAULT_OVERVIEW_MAX_PINS -> existing + key
                 else -> existing
             }
-            if (cards) old.copy(pinnedCards = next) else old.copy(pinnedItems = next)
+            if (cards) old.copy(pinnedCards = next) else old.togglePinnedItem(key)
         }
     }
     val setRecommend: (Boolean) -> Unit = { checked ->

@@ -34,6 +34,29 @@ class VaultOverviewConfigTest {
         assertEquals("local", VaultOverviewConfig(scope = "keepass:9999999999999999999999").normalized().scope)
     }
 
+    @Test fun removingPinnedAndRecommendedItemsPersistsWithoutChangingOtherModules() {
+        val config = VaultOverviewConfig(pinnedItems = listOf("local/password/one", "local/password/two"),
+            pinnedCards = listOf("local/BANK_CARD/card"), scope = "all")
+        val removed = config.removeFrequentItems(listOf("local/password/one", "bitwarden:2/password/recommended"))
+        val restored = VaultOverviewConfig.decode(removed.encode())
+        assertEquals(listOf("local/password/two"), restored.pinnedItems)
+        assertEquals(setOf("local/password/one", "bitwarden:2/password/recommended"), restored.excludedFrequentItems)
+        assertEquals(config.pinnedCards, restored.pinnedCards)
+        assertEquals(config.scope, restored.scope)
+        assertTrue(restored.recommendItems)
+        assertEquals(restored, restored.removeFrequentItems(listOf("local/password/one")))
+        assertTrue(VaultOverviewConfig.decode("""{"pinnedItems":["local/password/one"]}""").excludedFrequentItems.isEmpty())
+    }
+
+    @Test fun addingAnItemAgainClearsOnlyItsExclusionAndHonorsThePinLimit() {
+        val removed = VaultOverviewConfig().removeFrequentItems(listOf("one", "two"))
+        val restored = VaultOverviewConfig.decode(removed.togglePinnedItem("one").encode())
+        assertEquals(listOf("one"), restored.pinnedItems)
+        assertEquals(setOf("two"), restored.excludedFrequentItems)
+        val full = removed.copy(pinnedItems = List(VAULT_OVERVIEW_MAX_PINS) { "pin$it" })
+        assertEquals(full, full.togglePinnedItem("two"))
+    }
+
     @Test fun identitiesSeparateDatabasesTypesAndReusedLocalIdsButSurviveExternalRowRecreation() {
         val password = PasswordEntry(id = 1, title = "One", website = "", username = "", password = "secret", createdAt = Date(10))
         val card = SecureItem(id = 1, title = "One", itemType = ItemType.BANK_CARD, itemData = "secret", createdAt = Date(10))

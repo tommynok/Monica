@@ -75,7 +75,7 @@ class VaultOverviewPaneTest {
         database.close()
     }
 
-    private fun showPane() {
+    private fun showPane(followOverviewSettings: Boolean = false) {
         val security = SecurityManager(context)
         val passwords = PasswordRepository(database.passwordEntryDao(), categoryDao = database.categoryDao(),
             bitwardenFolderDao = database.bitwardenFolderDao(), passwordArchiveSyncMetaDao = database.passwordArchiveSyncMetaDao())
@@ -91,6 +91,11 @@ class VaultOverviewPaneTest {
         val keepass = keep(LocalKeePassViewModel(context.applicationContext as Application, database.localKeePassDatabaseDao(), security))
         val settingsModel = keep(SettingsViewModel(settings))
         compose.setContent {
+            LaunchedEffect(settingsModel, followOverviewSettings) {
+                if (followOverviewSettings) settingsModel.settings.collect { persisted ->
+                    appSettings = appSettings.copy(vaultOverviewConfig = persisted.vaultOverviewConfig)
+                }
+            }
             MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
                 state = rememberVaultV2PaneState(remember { VaultV2RetainedState() })
                 VaultV2Pane(passwordModel, totp, cards, documents, addresses, notes, passkeys,
@@ -208,6 +213,104 @@ class VaultOverviewPaneTest {
         capture("vault-grouped-single.png")
         compose.onNodeWithTag("vault_item_password:24").performClick()
         compose.runOnIdle { assertEquals(24L, openedPassword) }
+    }
+
+    private fun showSelectableOverview(pinCount: Int = 4) {
+        val config = runBlocking {
+            val identities = (1L..pinCount.toLong()).map { database.passwordEntryDao().getPasswordEntryById(it)!!.vaultOverviewKey() }
+            VaultOverviewConfig(
+                order = listOf(VaultOverviewModule.ITEMS.name, VaultOverviewModule.FAVORITES.name),
+                hidden = VaultOverviewModule.entries.filterNot { it == VaultOverviewModule.ITEMS || it == VaultOverviewModule.FAVORITES }
+                    .mapTo(hashSetOf()) { it.name },
+                pinnedItems = identities, recommendItems = false,
+            ).normalized().also { initial -> settings.updateVaultOverviewConfig { initial } }
+        }
+        appSettings = appSettings.copy(vaultOverviewConfig = config, disablePasswordVerification = true)
+        showPane(followOverviewSettings = true)
+        compose.waitUntil(15_000) { state.overviewSnapshot?.frequentItems?.size == minOf(pinCount, OVERVIEW_PREVIEW_LIMIT) }
+    }
+
+    private fun overviewRow(module: String, id: Int) = compose.onNode(
+        hasTestTag("overview_item_password:$id") and hasAnyAncestor(hasTestTag("overview_$module")),
+    )
+
+    @Test fun overviewLongPressScopesTheSharedActionBarAndBackExitsSelection() {
+        showSelectableOverview()
+        overviewRow("items", 1).performTouchInput { longClick() }
+        overviewRow("items", 2).performClick()
+        compose.runOnIdle { assertEquals(2, state.selectionCount); assertNull(openedPassword) }
+        overviewRow("items", 1).assertIsSelected()
+        overviewRow("items", 2).assertIsSelected()
+        compose.onNodeWithContentDescription(context.getString(R.string.vault_overview_remove_frequent_items)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(context.getString(R.string.delete)).assertDoesNotExist()
+        capture("overview-frequent-selection.png")
+        compose.onNodeWithTag("overview_modules").performScrollToNode(hasTestTag("overview_favorites"))
+        overviewRow("favorites", 1).assertIsNotSelected().performTouchInput { longClick() }
+        compose.runOnIdle { assertEquals(1, state.selectionCount) }
+        compose.onNodeWithContentDescription(context.getString(R.string.vault_overview_remove_frequent_items)).assertDoesNotExist()
+        compose.onNodeWithContentDescription(context.getString(R.string.delete)).assertIsDisplayed()
+        compose.onNodeWithContentDescription(context.getString(R.string.select_all)).performClick()
+        compose.runOnIdle { assertEquals(3, state.selectionCount) }
+        Espresso.pressBack()
+        compose.onNodeWithContentDescription(context.getString(R.string.select_all)).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, state.selectionCount); assertFalse(state.overviewListOpen) }
+        overviewRow("favorites", 2).performClick()
+        compose.runOnIdle { assertEquals(2L, openedPassword) }
+    }
+
+    @Test fun overviewSwipesSelectAndRemoveWithoutDeletingAndPickerCanRestoreTheItem() {
+        showSelectableOverview()
+        overviewRow("items", 4).performTouchInput { swipeRight() }
+        compose.runOnIdle { assertEquals(1, state.selectionCount) }
+        overviewRow("items", 4).assertIsSelected().performTouchInput { swipeRight() }
+        compose.runOnIdle { assertEquals(0, state.selectionCount) }
+        overviewRow("items", 4).performTouchInput { swipeLeft() }
+        compose.waitUntil(10_000) { state.overviewSnapshot?.frequentItems?.none { it.key == "password:4" } == true }
+        val entry = runBlocking { database.passwordEntryDao().getPasswordEntryById(4)!! }
+        assertFalse(entry.isDeleted)
+        assertTrue(runBlocking { settings.settingsFlow.first().vaultOverviewConfig.excludedFrequentItems.contains(entry.vaultOverviewKey()) })
+        compose.runOnIdle { assertEquals(24, state.overviewSnapshot?.items?.size) }
+        compose.onNodeWithTag("overview_pin_items").performClick()
+        compose.onNodeWithTag("overview_pin_list").performScrollToNode(hasTestTag("overview_pin_row_password:4"))
+        compose.onNodeWithTag("overview_pin_row_password:4").performClick()
+        compose.onNodeWithTag("overview_pin_done").performClick()
+        compose.waitUntil(10_000) { state.overviewSnapshot?.frequentItems?.any { it.key == "password:4" } == true }
+        assertFalse(runBlocking { settings.settingsFlow.first().vaultOverviewConfig.excludedFrequentItems.contains(entry.vaultOverviewKey()) })
+    }
+
+    @Test fun overviewBulkRemovalOnlyTouchesTheVisibleFrequentPreview() {
+        showSelectableOverview(pinCount = 24)
+        overviewRow("items", 1).performTouchInput { longClick() }
+        compose.onNodeWithContentDescription(context.getString(R.string.select_all)).performClick()
+        compose.runOnIdle { assertEquals(8, state.selectionCount) }
+        compose.onNodeWithContentDescription(context.getString(R.string.vault_overview_remove_frequent_items)).performClick()
+        compose.waitUntil(10_000) { state.overviewSnapshot?.frequentItems?.firstOrNull()?.key == "password:9" }
+        compose.runOnIdle {
+            assertEquals(0, state.selectionCount)
+            assertEquals(24, state.overviewSnapshot?.items?.size)
+            assertEquals(3, state.overviewSnapshot?.favorites?.size)
+        }
+        val saved = runBlocking { settings.settingsFlow.first().vaultOverviewConfig }
+        assertEquals(8, saved.excludedFrequentItems.size)
+        assertEquals(16, saved.pinnedItems.size)
+        runBlocking {
+            (1L..24L).forEach { assertFalse(database.passwordEntryDao().getPasswordEntryById(it)!!.isDeleted) }
+        }
+    }
+
+    @Test fun overviewFavoriteSwipeUsesTheExistingDeleteConfirmationAndTrash() {
+        showSelectableOverview()
+        compose.onNodeWithTag("overview_modules").performScrollToNode(hasTestTag("overview_favorites"))
+        overviewRow("favorites", 1).performTouchInput { swipeLeft() }
+        compose.onNode(isDialog()).assertIsDisplayed()
+        assertFalse(runBlocking { database.passwordEntryDao().getPasswordEntryById(1)!!.isDeleted })
+        compose.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        assertFalse(runBlocking { database.passwordEntryDao().getPasswordEntryById(1)!!.isDeleted })
+        overviewRow("favorites", 1).performTouchInput { swipeLeft() }
+        compose.onNode(hasText(context.getString(R.string.delete)) and hasAnyAncestor(isDialog())).performClick()
+        compose.waitUntil(10_000) { runBlocking { database.passwordEntryDao().getPasswordEntryById(1)?.isDeleted == true } }
+        compose.waitUntil(10_000) { state.overviewSnapshot?.favorites?.none { it.key == "password:1" } == true }
+        assertFalse(runBlocking { database.passwordEntryDao().getPasswordEntryById(2)!!.isDeleted })
     }
 
     private fun capture(name: String) {

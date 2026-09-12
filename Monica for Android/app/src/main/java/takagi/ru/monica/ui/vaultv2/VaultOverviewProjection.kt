@@ -184,12 +184,14 @@ internal fun prepareVaultOverview(
         val record = usage[identity]
         val legacy = item.passwordEntry?.id?.let(passwordUsage::get)
         val card = item.type in overviewCardTypes
+        val excluded = !card && identity in config.excludedFrequentItems
         batch[offset] = if (source in availableSources) (sourceIndices[source] ?: -1).toLong() else -1
         batch[offset + 1] = item.type.ordinal.toLong()
         batch[offset + 2] = (itemFolderKeys[index]?.let(folderIndices::get) ?: -1).toLong()
         batch[offset + 3] = if (item.isFavorite) 1 else 0
-        batch[offset + 4] = ((if (card) cardPins else itemPins)[identity] ?: -1).toLong()
-        batch[offset + 5] = maxOf(record?.count ?: 0, legacy?.openCount ?: 0, item.passkeyEntry?.useCount ?: 0).toLong().coerceAtLeast(0)
+        // Both aggregators skip unpinned rows with zero usage, without changing vault counts or favorites.
+        batch[offset + 4] = if (excluded) -1 else ((if (card) cardPins else itemPins)[identity] ?: -1).toLong()
+        batch[offset + 5] = if (excluded) 0 else maxOf(record?.count ?: 0, legacy?.openCount ?: 0, item.passkeyEntry?.useCount ?: 0).toLong().coerceAtLeast(0)
         batch[offset + 6] = maxOf(record?.lastOpenedAt ?: 0, legacy?.lastOpenedAt ?: 0,
             item.passkeyEntry?.takeIf { it.useCount > 0 }?.lastUsedAt ?: 0).coerceAtLeast(0)
         batch[offset + 7] = if (card) 1 else 0

@@ -54,6 +54,8 @@ internal fun VaultOverviewContent(
     onAllItems: () -> Unit,
     onSearch: () -> Unit,
     onUnlock: () -> Unit,
+    selection: VaultOverviewSelectionState,
+    onRequestDeleteItem: (VaultV2Item) -> Unit,
 ) {
     val context = LocalContext.current
     val database = remember(context) { PasswordDatabase.getDatabase(context) }
@@ -117,9 +119,10 @@ internal fun VaultOverviewContent(
     }
     val config = appSettings.vaultOverviewConfig
     // Module visibility, expansion, ordering and card focus are intentionally absent from this key.
-    val rankingConfig = remember(config.pinnedCards, config.pinnedItems, config.recommendCards, config.recommendItems) {
+    val rankingConfig = remember(config.pinnedCards, config.pinnedItems, config.recommendCards, config.recommendItems, config.excludedFrequentItems) {
         VaultOverviewConfig(pinnedCards = config.pinnedCards, pinnedItems = config.pinnedItems,
-            recommendCards = config.recommendCards, recommendItems = config.recommendItems)
+            recommendCards = config.recommendCards, recommendItems = config.recommendItems,
+            excludedFrequentItems = config.excludedFrequentItems)
     }
     var prepared by remember { mutableStateOf<VaultOverviewPreparedData?>(null) }
     LaunchedEffect(itemsReady, allItems, sources, rankingConfig, usage, passwordUsage,
@@ -161,5 +164,6 @@ internal fun VaultOverviewContent(
         onOpenType = onOpenType, onOpenFolder = onOpenFolder, onFavorites = onFavorites,
         onArchive = onArchive, onTrash = onTrash, onAllItems = onAllItems, onSearch = onSearch,
         onUnlock = onUnlock, modifier = Modifier.fillMaxSize(),
+        selection = selection, onRequestDeleteItem = onRequestDeleteItem,
     )
 }

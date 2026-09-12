@@ -25,6 +25,7 @@ data class VaultOverviewConfig(
     val recommendCards: Boolean = true,
     val recommendItems: Boolean = true,
     val scope: String = "local",
+    val excludedFrequentItems: Set<String> = emptySet(),
 ) {
     fun normalized(): VaultOverviewConfig = copy(
         order = (order + VaultOverviewModule.defaultOrder).distinct()
@@ -33,10 +34,28 @@ data class VaultOverviewConfig(
         collapsed = collapsed.intersect(VaultOverviewModule.defaultOrder.toSet()),
         pinnedCards = pinnedCards.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_PINS),
         pinnedItems = pinnedItems.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_PINS),
+        excludedFrequentItems = excludedFrequentItems.filterTo(linkedSetOf(), String::isNotBlank) -
+            pinnedItems.filter(String::isNotBlank).distinct().take(VAULT_OVERVIEW_MAX_PINS).toSet(),
         scope = scope.takeIf {
             it == "all" || it == "local" || (DATABASE_SCOPE.matches(it) && it.substringAfter(':').toLongOrNull() != null)
         } ?: "local",
     )
+
+    /** Removing a recommendation must survive later opens, syncs and app restarts. */
+    fun removeFrequentItems(identities: Collection<String>): VaultOverviewConfig {
+        val removed = identities.filterTo(hashSetOf(), String::isNotBlank)
+        return copy(
+            pinnedItems = pinnedItems.filterNot(removed::contains),
+            excludedFrequentItems = excludedFrequentItems + removed,
+        )
+    }
+
+    fun togglePinnedItem(identity: String): VaultOverviewConfig = when {
+        identity.isBlank() -> this
+        identity in pinnedItems -> copy(pinnedItems = pinnedItems - identity)
+        pinnedItems.size >= VAULT_OVERVIEW_MAX_PINS -> this
+        else -> copy(pinnedItems = pinnedItems + identity, excludedFrequentItems = excludedFrequentItems - identity)
+    }
 
     fun encode(): String = json.encodeToString(normalized())
 

@@ -59,6 +59,31 @@ class VaultOverviewNativeTest {
         assertNull(RustVaultOverviewCore.project(longArrayOf(1, -1, 0, -1, 3, 7)))
     }
 
+    @Test fun removedFrequentItemsStayExcludedInRealNativeProjection() {
+        val rows = buildVaultV2PasswordItems(List(OVERVIEW_NATIVE_THRESHOLD + 4) { index ->
+            PasswordEntry(id = index + 1L, title = "Entry $index", website = "", username = "account",
+                password = "", bitwardenVaultId = if (index % 2 == 0) 2 else null, isFavorite = index < 4)
+        })
+        val sources = listOf(VaultOverviewSource("local", "Local", "Monica"),
+            VaultOverviewSource("bitwarden:2", "Work", "Bitwarden"))
+        val removed = rows.take(3).map { it.overviewIdentity() }
+        val config = VaultOverviewConfig(pinnedItems = rows.take(4).map { it.overviewIdentity() })
+            .removeFrequentItems(removed)
+        val usage = rows.associate { it.overviewIdentity() to VaultOverviewUsage(it.overviewIdentity(), 100, 9999) }
+        val legacy = rows.associate { it.passwordEntry!!.id to PasswordQuickAccessRecord(it.passwordEntry.id, 1000, 99999) }
+        val prepared = prepareVaultOverview(rows, sources, config, usage, legacy,
+            emptyList(), emptyList(), emptyMap(), emptyList())
+        for (scope in listOf("all", "local", "bitwarden:2")) {
+            val expected = projectVaultOverview(prepared, scope, aggregate = ::aggregateVaultOverviewKotlin)
+            val actual = projectVaultOverview(prepared, scope, aggregate = this::native)
+            assertEquals(expected, actual)
+            assertFalse(actual.frequentItems.any { it.overviewIdentity() in removed })
+        }
+        val all = projectVaultOverview(prepared, "all", aggregate = this::native)
+        assertEquals(rows, all.items)
+        assertEquals(rows.take(4), all.favorites)
+    }
+
     @Test fun measuresJniAndFullSnapshotCostBeforeChoosingTheThreshold() {
         val measurements = JSONArray()
         var sink = 0

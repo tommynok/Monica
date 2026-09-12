@@ -1,6 +1,8 @@
 package takagi.ru.monica.ui.vaultv2
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +25,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +48,7 @@ import takagi.ru.monica.ui.icons.VaultItemIcon
 import takagi.ru.monica.ui.common.pull.PullSearchDefaults
 import takagi.ru.monica.ui.common.pull.PullSearchHint
 import takagi.ru.monica.ui.common.pull.rememberPullToSearchState
+import takagi.ru.monica.ui.gestures.SwipeActions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +81,8 @@ internal fun VaultOverviewScreen(
     cardStackState: VaultOverviewCardStackState = remember { VaultOverviewCardStackState() },
     isDetailVisible: Boolean = false,
     modifier: Modifier = Modifier,
+    selection: VaultOverviewSelectionState = remember { VaultOverviewSelectionState() },
+    onRequestDeleteItem: (VaultV2Item) -> Unit = {},
 ) {
     var showSources by rememberSaveable { mutableStateOf(false) }
     var showCustomization by rememberSaveable { mutableStateOf(false) }
@@ -84,6 +90,22 @@ internal fun VaultOverviewScreen(
     var showAllFolders by rememberSaveable { mutableStateOf(false) }
     val sourceByKey = remember(sources) { sources.associateBy(VaultOverviewSource::key) }
     val selectedSource = sourceByKey[currentScope]
+    val frequentPreview = snapshot?.selectablePreview(VaultOverviewModule.ITEMS, config).orEmpty()
+    val favoritesPreview = snapshot?.selectablePreview(VaultOverviewModule.FAVORITES, config).orEmpty()
+    val selectionModule = selection.module
+    LaunchedEffect(selectionModule, frequentPreview, favoritesPreview, currentScope, selectedSource?.locked) {
+        if (selectionModule != null) {
+            val visible = when {
+                selectedSource?.locked == true || snapshot?.scope != currentScope -> emptyList()
+                selectionModule == VaultOverviewModule.ITEMS -> frequentPreview
+                else -> favoritesPreview
+            }
+            selection.retainVisible(visible.mapTo(hashSetOf()) { it.key })
+        }
+    }
+    LaunchedEffect(cardStackState.expanded) {
+        if (cardStackState.expanded) selection.clear()
+    }
     val scopeName = selectedSource?.name ?: stringResource(
         if (currentScope == "all") R.string.vault_overview_all_databases else R.string.vault_overview_choose_database)
     val visibleModules = remember(config.order, config.hidden) {
@@ -99,7 +121,7 @@ internal fun VaultOverviewScreen(
     val density = LocalDensity.current
     val searchTriggerDistance = with(density) { PullSearchDefaults.TriggerDistance.toPx() }
     val pullSearch = rememberPullToSearchState(
-        isSearchExpanded = isDetailVisible,
+        isSearchExpanded = isDetailVisible || selectionModule != null,
         searchTriggerDistance = searchTriggerDistance,
         maxDragDistance = with(density) { 100.dp.toPx() },
         onSearchTriggered = onSearch,
@@ -215,17 +237,41 @@ internal fun VaultOverviewScreen(
                                     else OverviewCards(walletCards, selectedCardKey, listState,
                                         cardStackState, isDetailVisible, onManage = { pinModule = VaultOverviewModule.CARDS.name })
                                 VaultOverviewModule.ITEMS, VaultOverviewModule.FAVORITES -> {
-                                    val rows = if (module == VaultOverviewModule.ITEMS) snapshot.frequentItems else snapshot.favorites
-                                    if (rows.isEmpty()) OverviewEmpty(if (module == VaultOverviewModule.ITEMS) R.string.vault_overview_empty_items else R.string.vault_overview_empty_favorites)
+                                    val frequent = module == VaultOverviewModule.ITEMS
+                                    val preview = if (frequent) frequentPreview else favoritesPreview
+                                    if (preview.isEmpty()) OverviewEmpty(if (frequent) R.string.vault_overview_empty_items else R.string.vault_overview_empty_favorites)
                                     else Column(verticalArrangement = Arrangement.spacedBy(GroupedItemDefaults.Spacing)) {
-                                        val preview = rows.take(if (module == VaultOverviewModule.ITEMS) OVERVIEW_PREVIEW_LIMIT else 3)
                                         preview.forEachIndexed { index, row ->
                                             key(row.key) {
-                                                OverviewItemRow(
-                                                    item = row,
-                                                    shape = GroupedItemDefaults.shape(index, preview.size),
-                                                    onClick = { onOpenItem(row) },
-                                                )
+                                                val shape = GroupedItemDefaults.shape(index, preview.size)
+                                                SwipeActions(
+                                                    onSwipeLeft = {
+                                                        if (frequent) {
+                                                            val identity = row.overviewIdentity()
+                                                            onConfigChange { it.removeFrequentItems(listOf(identity)) }
+                                                            selection.clear()
+                                                        } else onRequestDeleteItem(row)
+                                                    },
+                                                    onSwipeRight = { selection.toggle(module, row.key) },
+                                                    enabled = !isDetailVisible,
+                                                    cardShape = shape,
+                                                    leftActionLabel = stringResource(if (frequent) R.string.vault_overview_remove_frequent_items else R.string.swipe_action_delete),
+                                                    leftActionIcon = if (frequent) Icons.Default.RemoveCircleOutline else Icons.Default.Delete,
+                                                    leftActionColor = if (frequent) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer,
+                                                    leftActionContentColor = if (frequent) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+                                                ) {
+                                                    OverviewItemRow(
+                                                        item = row,
+                                                        shape = shape,
+                                                        selected = selection.isSelected(module, row.key),
+                                                        selectionMode = selectionModule == module,
+                                                        onClick = {
+                                                            if (selectionModule != null) selection.toggle(module, row.key)
+                                                            else onOpenItem(row)
+                                                        },
+                                                        onLongClick = { selection.toggle(module, row.key) },
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -294,8 +340,16 @@ internal fun VaultOverviewScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun OverviewItemRow(item: VaultV2Item, shape: Shape, onClick: () -> Unit) {
+private fun OverviewItemRow(
+    item: VaultV2Item,
+    shape: Shape,
+    selected: Boolean,
+    selectionMode: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     ListItem(headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(item.subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingContent = {
@@ -312,8 +366,18 @@ private fun OverviewItemRow(item: VaultV2Item, shape: Shape, onClick: () -> Unit
                 Icon(item.type.icon(), null, tint = MaterialTheme.colorScheme.primary)
             }
         },
-        modifier = Modifier.clip(shape).clickable(role = Role.Button, onClick = onClick).testTag("overview_item_${item.key}"),
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
+        trailingContent = if (selectionMode) ({ Checkbox(checked = selected, onCheckedChange = null) }) else null,
+        modifier = Modifier.clip(shape)
+            .combinedClickable(
+                role = if (selectionMode) Role.Checkbox else Role.Button,
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onLongClickLabel = stringResource(R.string.swipe_action_select),
+            )
+            .semantics { this.selected = selected }
+            .testTag("overview_item_${item.key}"),
+        colors = ListItemDefaults.colors(containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
+            else MaterialTheme.colorScheme.surfaceContainerLow))
 }
 
 @Composable
