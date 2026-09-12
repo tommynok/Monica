@@ -68,10 +68,10 @@ class SteamBoundaryGuardTest {
     }
 
     @Test
-    fun steamDoesNotChangeMainPasswordDatabaseSchema() {
+    fun steamTablesStayOutOfTheMainPasswordDatabase() {
         val source = projectFile("app/src/main/java/takagi/ru/monica/data/PasswordDatabase.kt").readText()
 
-        assertTrue(source.contains("version = 77"))
+        // Other vault features may migrate this database independently of Steam.
         assertFalse(source.contains("SteamAccountEntity::class"))
         assertFalse(source.contains("abstract fun steamAccountDao"))
     }
@@ -676,6 +676,8 @@ class SteamBoundaryGuardTest {
             .readText()
         val qrDiagnosticsSource = projectFile("app/src/main/java/takagi/ru/monica/ui/scanner/QrScannerDiagnostics.kt")
             .readText()
+        val zxingDecoderSource = projectFile("app/src/main/java/takagi/ru/monica/ui/scanner/ZxingBarcodeDecoder.kt")
+            .readText()
         val extensionsScreenSource = projectFile("app/src/main/java/takagi/ru/monica/ui/screens/ExtensionsScreen.kt")
             .readText()
         val bottomNavSource = projectFile("app/src/main/java/takagi/ru/monica/ui/main/navigation/BottomNavModel.kt")
@@ -755,7 +757,7 @@ class SteamBoundaryGuardTest {
         assertFalse(steamQrScannerSource.contains("MultiFormatAnalyzer("))
         assertFalse(steamQrScannerSource.contains("SteamQrZxingLiteAnalyzer("))
         assertFalse(appGradleSource.contains("com.google.android.gms:play-services-mlkit-barcode-scanning"))
-        assertTrue(appGradleSource.contains("com.google.mlkit:barcode-scanning"))
+        assertFalse(appGradleSource.contains("com.google.mlkit:barcode-scanning"))
         assertFalse(appGradleSource.contains("zxing-lite"))
         assertFalse(manifestSource.contains("com.google.mlkit.vision.DEPENDENCIES"))
         assertFalse(manifestSource.contains("android:value=\"barcode\""))
@@ -764,11 +766,11 @@ class SteamBoundaryGuardTest {
         assertFalse(extensionsScreenSource.contains("ConnectionResult.SUCCESS"))
         assertFalse(extensionsScreenSource.contains("steam_mlkit_scanner_title"))
         assertFalse(extensionsScreenSource.contains("steamScannerPreferences.updateUseMlKitScanner(enabled)"))
-        assertTrue(qrCameraSessionSource.contains("BarcodeScanning.getClient("))
+        assertFalse(qrCameraSessionSource.contains("BarcodeScanning.getClient("))
         assertTrue(qrCameraSessionSource.contains("LifecycleCameraController(appContext)"))
         assertFalse(qrScannerSource.contains("ProcessCameraProvider.getInstance(context)"))
-        assertTrue(qrCameraSessionSource.contains("InputImage.fromMediaImage("))
-        assertTrue(qrScannerSource.contains("InputImage.fromFilePath(context, uri)"))
+        assertFalse(qrCameraSessionSource.contains("InputImage.fromMediaImage("))
+        assertFalse(qrScannerSource.contains("InputImage.fromFilePath(context, uri)"))
         assertTrue(qrCameraSessionSource.contains("FocusMeteringAction.FLAG_AF"))
         assertTrue(qrCameraSessionSource.contains("FocusMeteringAction.FLAG_AE"))
         assertTrue(qrCameraSessionSource.contains("FocusMeteringAction.FLAG_AWB"))
@@ -813,9 +815,14 @@ class SteamBoundaryGuardTest {
 
         assertTrue(qrScannerSource.contains("allowedFormats: Collection<BarcodeFormat> = DEFAULT_SCANNER_FORMATS"))
         assertTrue(qrScannerSource.contains("resultValidator: (String) -> Boolean = { true }"))
-        assertTrue(qrScannerSource.contains("createMlKitBarcodeScanner(mlKitFormats)"))
+        assertTrue(qrScannerSource.contains("ZxingBarcodeDecoder(allowedFormats)"))
+        assertTrue(zxingDecoderSource.contains("MultiFormatReader"))
+        assertTrue(zxingDecoderSource.contains("DecodeHintType.POSSIBLE_FORMATS"))
+        assertFalse(zxingDecoderSource.contains("com.google.mlkit"))
+        assertFalse(qrCameraSessionSource.contains("com.google.mlkit"))
+        assertFalse(qrScannerSource.contains("com.google.mlkit"))
         assertTrue(qrCameraSessionSource.contains("private fun analyzeFrame(imageProxy: ImageProxy)"))
-        assertTrue(qrScannerSource.contains("processImageWithMlKit("))
+        assertTrue(qrScannerSource.contains("processImageWithZxing("))
         assertTrue(qrScannerSource.contains("invalidResultMessage: String? = null"))
         assertTrue(qrScannerSource.contains("diagnosticLabel: String? = null"))
         assertTrue(qrScannerSource.contains("onDiagnostic: ((String) -> Unit)? = null"))
@@ -830,9 +837,9 @@ class SteamBoundaryGuardTest {
         assertTrue(qrDiagnosticsSource.contains("\"gallery_result\""))
         assertTrue(qrScannerSource.contains("onInvalid: () -> Unit"))
         assertTrue(qrScannerSource.contains("candidates.isEmpty()"))
-        assertTrue(qrCameraSessionSource.contains("url?.url"))
-        assertTrue(qrScannerSource.contains("allowedFormats.toMlKitFormatList()"))
-        assertTrue(qrCameraSessionSource.contains("Barcode.FORMAT_QR_CODE"))
+        assertFalse(qrCameraSessionSource.contains("url?.url"))
+        assertFalse(qrScannerSource.contains("allowedFormats.toMlKitFormatList()"))
+        assertFalse(qrCameraSessionSource.contains("Barcode.FORMAT_QR_CODE"))
         assertFalse(qrCameraSessionSource.contains("ML_KIT_FRAME_TIMEOUT_MS"))
         assertTrue(qrScannerSource.contains("scanGeneration"))
 
