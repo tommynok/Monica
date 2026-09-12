@@ -68,10 +68,10 @@ class SteamBoundaryGuardTest {
     }
 
     @Test
-    fun steamDoesNotChangeMainPasswordDatabaseSchema() {
+    fun steamTablesStayOutOfTheMainPasswordDatabase() {
         val source = projectFile("app/src/main/java/takagi/ru/monica/data/PasswordDatabase.kt").readText()
 
-        assertTrue(source.contains("version = 77"))
+        // Other vault features may migrate this database independently of Steam.
         assertFalse(source.contains("SteamAccountEntity::class"))
         assertFalse(source.contains("abstract fun steamAccountDao"))
     }

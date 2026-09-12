@@ -119,6 +119,10 @@ internal class QrScannerDiagnostics(
         log("result_accepted", snapshot(processing = false))
     }
 
+    fun logResultDeliveryFailed(error: Throwable) {
+        log("result_delivery_failed", "error=${error.safeErrorName()}")
+    }
+
     fun logGalleryStart() {
         log("gallery_start")
     }

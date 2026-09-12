@@ -4,17 +4,16 @@ import android.graphics.Bitmap
 import androidx.camera.core.ImageProxy
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
-import com.google.zxing.ChecksumException
 import com.google.zxing.DecodeHintType
-import com.google.zxing.FormatException
-import com.google.zxing.InvertedLuminanceSource
 import com.google.zxing.LuminanceSource
 import com.google.zxing.MultiFormatReader
-import com.google.zxing.NotFoundException
 import com.google.zxing.PlanarYUVLuminanceSource
+import com.google.zxing.ReaderException
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.GlobalHistogramBinarizer
 import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.multi.GenericMultipleBarcodeReader
+import com.google.zxing.multi.qrcode.QRCodeMultiReader
 import java.nio.ByteBuffer
 
 /**
@@ -28,45 +27,65 @@ import java.nio.ByteBuffer
  */
 internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat>) {
 
+    private val hints = mapOf(
+        DecodeHintType.POSSIBLE_FORMATS to formats.distinct(),
+        DecodeHintType.TRY_HARDER to true,
+        DecodeHintType.CHARACTER_SET to "UTF-8"
+    )
+    private val qrReader = QRCodeMultiReader()
+    private val otherFormats = formats.filterNot { it == BarcodeFormat.QR_CODE }.distinct()
+    private val otherHints = hints + (DecodeHintType.POSSIBLE_FORMATS to otherFormats)
     private val reader = MultiFormatReader().apply {
-        setHints(
-            mapOf(
-                DecodeHintType.POSSIBLE_FORMATS to formats.distinct(),
-                DecodeHintType.TRY_HARDER to true,
-                DecodeHintType.CHARACTER_SET to "UTF-8"
-            )
-        )
+        setHints(otherHints)
     }
+    private val multipleReader = GenericMultipleBarcodeReader(reader)
+    private var frameNumber = 0
+    private var decimatedLuminance = ByteArray(0)
+    private var fullLuminance = ByteArray(0)
+    private var rowBuffer = ByteArray(0)
 
     /**
-     * 解析一帧相机画面；返回码值，本帧无可读码返回 null，
+     * 解析一帧相机画面；返回所有候选码值，本帧无可读码返回空列表，
      * 只有真正的异常错误才向上抛出。
      * 仅在单帧分析线程上调用，读取器内部状态因此无需加锁。
      */
-    fun decodeFrame(imageProxy: ImageProxy): String? {
+    fun decodeFrame(imageProxy: ImageProxy): List<String> {
         val plane = imageProxy.planes[0]
-        val width = imageProxy.width
-        val height = imageProxy.height
+        val crop = imageProxy.cropRect
+        require(crop.left >= 0 && crop.top >= 0 && crop.right <= imageProxy.width && crop.bottom <= imageProxy.height)
+        val width = crop.width()
+        val height = crop.height()
+        require(width > 0 && height > 0)
+        val buffer = plane.buffer.duplicate()
+        val origin = buffer.position() + crop.top * plane.rowStride + crop.left * plane.pixelStride
         val rotationQuarterTurns =
             ((imageProxy.imageInfo.rotationDegrees % 360) + 360) % 360 / 90
 
         // 第一级：抽稀解码面（对齐 ML Kit 内部降采样行为），常规尺寸的码在此秒出。
         val outWidth = (width + DECIMATION - 1) / DECIMATION
         val outHeight = (height + DECIMATION - 1) / DECIMATION
-        val decimated = copyLuminance(plane.buffer, width, height, plane.rowStride, plane.pixelStride, DECIMATION)
+        decimatedLuminance = copyLuminance(
+            buffer, origin, width, height, plane.rowStride, plane.pixelStride, DECIMATION, decimatedLuminance
+        )
         val decimatedSource = rotated(
-            PlanarYUVLuminanceSource(decimated, outWidth, outHeight, 0, 0, outWidth, outHeight, false),
+            PlanarYUVLuminanceSource(decimatedLuminance, outWidth, outHeight, 0, 0, outWidth, outHeight, false),
             rotationQuarterTurns
         )
-        decodeWithFallback(decimatedSource)?.let { return it }
+        val candidates = decodeWithFallback(decimatedSource)
+        frameNumber = (frameNumber + 1) % FULL_RESOLUTION_INTERVAL
+        // Periodically inspect full resolution even after a hit: an unrelated large
+        // code must not permanently hide a smaller code accepted by the caller.
+        if (candidates.isNotEmpty() && frameNumber != 0) return candidates
 
         // 第二级：第一级落空时才构建的全分辨率亮度面，覆盖画面中占比很小的码。
-        val full = copyLuminance(plane.buffer, width, height, plane.rowStride, plane.pixelStride, 1)
+        fullLuminance = copyLuminance(
+            buffer, origin, width, height, plane.rowStride, plane.pixelStride, 1, fullLuminance
+        )
         val fullSource = rotated(
-            PlanarYUVLuminanceSource(full, width, height, 0, 0, width, height, false),
+            PlanarYUVLuminanceSource(fullLuminance, width, height, 0, 0, width, height, false),
             rotationQuarterTurns
         )
-        return decodeWithFallback(fullSource)
+        return (candidates + decodeWithFallback(fullSource)).distinct()
     }
 
     /**
@@ -75,20 +94,25 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
      */
     private fun copyLuminance(
         buffer: ByteBuffer,
+        origin: Int,
         width: Int,
         height: Int,
         rowStride: Int,
         pixelStride: Int,
-        step: Int
+        step: Int,
+        reusable: ByteArray
     ): ByteArray {
         val outWidth = (width + step - 1) / step
         val outHeight = (height + step - 1) / step
-        val luminance = ByteArray(outWidth * outHeight)
-        val rowBuffer = ByteArray(width)
+        require(rowStride > 0 && pixelStride > 0 && origin >= 0)
+        val lastPixel = origin.toLong() + (height - 1L) * rowStride + (width - 1L) * pixelStride
+        require(lastPixel < buffer.limit()) { "Incomplete camera luminance plane" }
+        val luminance = reusable.takeIf { it.size == outWidth * outHeight } ?: ByteArray(outWidth * outHeight)
+        if (rowBuffer.size < width) rowBuffer = ByteArray(width)
         var destinationRow = 0
         if (pixelStride == 1) {
             for (row in 0 until height step step) {
-                buffer.position(row * rowStride)
+                buffer.position(origin + row * rowStride)
                 buffer.get(rowBuffer, 0, width)
                 var destination = destinationRow * outWidth
                 for (column in 0 until width step step) {
@@ -100,7 +124,7 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
             for (row in 0 until height step step) {
                 var destination = destinationRow * outWidth
                 for (column in 0 until width step step) {
-                    luminance[destination++] = buffer.get(row * rowStride + column * pixelStride)
+                    luminance[destination++] = buffer.get(origin + row * rowStride + column * pixelStride)
                 }
                 destinationRow++
             }
@@ -110,26 +134,32 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
 
     /** 解析相册位图；zxing 不读 EXIF 方向，依次尝试 4 个旋转角。 */
     @Synchronized
-    fun decodeBitmap(bitmap: Bitmap): String? {
+    fun decodeBitmap(bitmap: Bitmap): List<String> {
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
         var source: LuminanceSource = RGBLuminanceSource(bitmap.width, bitmap.height, pixels)
         repeat(ROTATION_ATTEMPTS) {
-            decodeWithFallback(source)?.let { return it }
+            val candidates = decodeWithFallback(source)
+            if (candidates.isNotEmpty()) return candidates
             source = rotateSourceCounterClockwise(source)
         }
-        return null
+        return emptyList()
     }
 
     /**
      * 解码阶梯：Hybrid 二值化（正色 → 反色）→ GlobalHistogram 兜底（正色 → 反色）。
      * 反色扫描覆盖暗底亮码；GlobalHistogram 对小模块和一维码与 Hybrid 互补。
      */
-    internal fun decodeWithFallback(source: LuminanceSource): String? {
-        decode(BinaryBitmap(HybridBinarizer(source)))?.let { return it }
-        decode(BinaryBitmap(HybridBinarizer(InvertedLuminanceSource(source))))?.let { return it }
-        decode(BinaryBitmap(GlobalHistogramBinarizer(source)))?.let { return it }
-        return decode(BinaryBitmap(GlobalHistogramBinarizer(InvertedLuminanceSource(source))))
+    internal fun decodeWithFallback(source: LuminanceSource): List<String> {
+        val candidates = linkedSetOf<String>()
+        for (polarity in listOf(source, source.invert())) {
+            val hybrid = decode(BinaryBitmap(HybridBinarizer(polarity)))
+            candidates += hybrid
+            if (hybrid.isEmpty()) {
+                candidates += decode(BinaryBitmap(GlobalHistogramBinarizer(polarity)))
+            }
+        }
+        return candidates.toList()
     }
 
     private fun rotated(source: LuminanceSource, quarterTurns: Int): LuminanceSource {
@@ -158,22 +188,32 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
         return PlanarYUVLuminanceSource(dst, newWidth, oldWidth, 0, 0, newWidth, oldWidth, false)
     }
 
-    private fun decode(bitmap: BinaryBitmap): String? {
-        return try {
-            reader.decodeWithState(bitmap).text
-        } catch (expected: NotFoundException) {
-            null
-        } catch (expected: FormatException) {
-            null
-        } catch (expected: ChecksumException) {
-            null
-        } finally {
-            reader.reset()
+    private fun decode(bitmap: BinaryBitmap): List<String> {
+        val candidates = linkedSetOf<String>()
+        if (BarcodeFormat.QR_CODE in formats) {
+            try {
+                qrReader.decodeMultiple(bitmap, hints).forEach { candidates += it.text }
+            } catch (_: ReaderException) {
+                // An empty frame is normal; retain a reusable reader for the next frame.
+            } finally {
+                qrReader.reset()
+            }
         }
+        if (otherFormats.isNotEmpty()) {
+            try {
+                multipleReader.decodeMultiple(bitmap, otherHints).forEach { candidates += it.text }
+            } catch (_: ReaderException) {
+                // Other formats are optional candidates, independent of QR detection.
+            } finally {
+                reader.reset()
+            }
+        }
+        return candidates.map(String::trim).filter(String::isNotEmpty).distinct()
     }
 
     private companion object {
         private const val ROTATION_ATTEMPTS = 4
         private const val DECIMATION = 2
+        private const val FULL_RESOLUTION_INTERVAL = 3
     }
 }

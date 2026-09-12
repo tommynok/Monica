@@ -5,7 +5,7 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.qrcode.QRCodeWriter
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -27,8 +27,8 @@ class ZxingBarcodeDecoderTest {
         for (y in 0 until size) {
             for (x in 0 until size) {
                 // 正色码：暗模块 = 低亮度；反色码整体翻转（暗底亮码）
-                val bright = matrix.get(x, y) != inverted
-                luminance[y * size + x] = (if (bright) 255 else 0).toByte()
+                val dark = matrix.get(x, y) != inverted
+                luminance[y * size + x] = (if (dark) 0 else 255).toByte()
             }
         }
         return PlanarYUVLuminanceSource(luminance, size, size, 0, 0, size, size, false)
@@ -36,12 +36,12 @@ class ZxingBarcodeDecoderTest {
 
     @Test
     fun `normal contrast qr decodes`() {
-        assertEquals(payload, decoder.decodeWithFallback(qrLuminanceSource(inverted = false)))
+        assertEquals(listOf(payload), decoder.decodeWithFallback(qrLuminanceSource(inverted = false)))
     }
 
     @Test
     fun `inverted dark-theme qr decodes`() {
-        assertEquals(payload, decoder.decodeWithFallback(qrLuminanceSource(inverted = true)))
+        assertEquals(listOf(payload), decoder.decodeWithFallback(qrLuminanceSource(inverted = true)))
     }
 
     @Test
@@ -49,7 +49,7 @@ class ZxingBarcodeDecoderTest {
         val size = 420
         val blank = ByteArray(size * size) { 255.toByte() }
         val source = PlanarYUVLuminanceSource(blank, size, size, 0, 0, size, size, false)
-        assertNull(decoder.decodeWithFallback(source))
+        assertTrue(decoder.decodeWithFallback(source).isEmpty())
     }
 
     @Test

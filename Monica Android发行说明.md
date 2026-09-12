@@ -4,6 +4,7 @@
 
 ### 简要
 
+- 感谢 [@aiguozhi123456](https://github.com/aiguozhi123456) 贡献 [#133](https://github.com/Monica-Pass/Monica/pull/133)：精简扫码依赖，保留相机与相册识别，支持反色、多码识别并完善长时间扫码的恢复能力。
 - 感谢 [@tommynok](https://github.com/tommynok) 贡献 [#134](https://github.com/Monica-Pass/Monica/pull/134)：修复导入页面底部操作栏被系统导航栏遮挡的问题，CSV 导入失败提示现已适配全部八种应用语言。
 - 感谢 [@tommynok](https://github.com/tommynok) 贡献 [#131](https://github.com/Monica-Pass/Monica/pull/131)：补全俄语翻译、安全问题本地化，并改善较长文字的布局。
 - 修复 [#128](https://github.com/Monica-Pass/Monica/issues/128)：分组样式选项和 MDBX 管理器随应用语言显示，补全英文、中文和俄语文案，切换语言后及时刷新。
@@ -22,6 +23,7 @@
 
 ### 详细
 
+- Steam 与验证器共用 CameraX 相机预览和 ZXing 识别引擎，保留原有 13 种码制、反色二维码和小码识别；同一画面或图片中的多个码交由页面筛选。解码在后台完成，释放相机帧后在主线程处理结果，扫码会话支持中断恢复与前后台切换。
 - [@tommynok](https://github.com/tommynok) 的 [#131](https://github.com/Monica-Pass/Monica/pull/131) 补充俄语界面翻译并统一术语；预设安全问题现在随应用语言显示，保留原有问题编号和自定义问题。权限卡片、预设字段对话框及分段按钮为较长文字预留空间，减少文字挤压、异常换行和按钮高度不一致。
 - 分组方式的标题、说明和预览标签改用语言资源。MDBX 本地与远程管理、创建与打开、迁移、历史、快照、健康诊断、修复及确认提示移除中文硬编码，其他尚无译文的语言使用英文回退。历史日期遵循当前应用语言；切换语言会刷新缓存的展示文案，保留原有分组标识、用户内容和数据库操作逻辑。
 - 多选卡片即可创建或加入卡叠，无需命名；卡叠置顶，普通卡片保留原有排序。
@@ -45,6 +47,7 @@
 
 ### Summary
 
+- Thanks to [@aiguozhi123456](https://github.com/aiguozhi123456) for [#133](https://github.com/Monica-Pass/Monica/pull/133): reduced scanner dependencies while retaining camera and gallery scanning, inverted and multiple-code recognition, and recovery during extended scanning sessions.
 - Thanks to [@tommynok](https://github.com/tommynok) for [#134](https://github.com/Monica-Pass/Monica/pull/134): the import action bar now respects system navigation insets, and CSV import failure messages support all eight app languages.
 - Thanks to [@tommynok](https://github.com/tommynok) for [#131](https://github.com/Monica-Pass/Monica/pull/131): expanded Russian translations, localized security questions, and improved layouts for longer labels.
 - Fixed [#128](https://github.com/Monica-Pass/Monica/issues/128): grouping options and the MDBX manager follow the app language, with English, Chinese, and Russian text that refreshes after language changes.
@@ -63,6 +66,7 @@
 
 ### Details
 
+- Steam and the authenticator share CameraX preview and ZXing decoding, retaining all 13 barcode formats, inverted QR codes, and small-code recognition. Multiple candidates from the camera or gallery are filtered by the calling screen. Decoding stays in the background; frames are released before main-thread result delivery, with camera recovery and support for background/resume transitions.
 - [@tommynok](https://github.com/tommynok)'s [#131](https://github.com/Monica-Pass/Monica/pull/131) fills gaps in Russian translations and makes terminology consistent. Preset security questions now follow the app language while retaining existing question IDs and custom questions. Permission cards, preset-field dialogs, and segmented buttons give longer text enough room, reducing cramped labels, awkward wrapping, and mismatched button heights.
 - Grouping titles, descriptions, and preview labels now use language resources. Local and remote MDBX management, create/open flows, migration, history, snapshots, health diagnostics, repairs, and confirmation dialogs no longer use hardcoded Chinese. Languages without a translation fall back to English. History dates follow the app locale, and cached presentation text refreshes when the language changes while grouping identifiers, user content, and database operations retain their existing behavior.
 - Select cards to create or join a stack without naming it. Stacks appear first; individual cards retain their sort order.

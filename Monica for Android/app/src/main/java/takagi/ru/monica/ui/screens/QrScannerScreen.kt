@@ -40,6 +40,7 @@ import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.zxing.BarcodeFormat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -200,7 +201,9 @@ private fun QrCodeScanner(
     val currentInvalidResultMessage = rememberUpdatedState(invalidResultMessage)
     var scanGeneration by remember { mutableIntStateOf(0) }
     var pendingRestartReason by remember { mutableStateOf<QrScanRestartReason?>(null) }
-    val previewView = remember(context, scanGeneration) {
+    // AndroidView keeps its factory result. Recovery must rebind the visible view,
+    // rather than create a new PreviewView that never gets attached to the window.
+    val previewView = remember(context) {
         PreviewView(context).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
@@ -208,11 +211,19 @@ private fun QrCodeScanner(
     }
     var showOverlay by remember { mutableStateOf(false) }
 
-    val acceptResult: (String?) -> Unit = acceptResult@{ raw ->
-        val value = raw?.trim()?.takeIf { it.isNotBlank() } ?: return@acceptResult
-        if (currentValidator.value(value) && scanConsumed.compareAndSet(false, true)) {
-            diagnostics?.logResultAccepted()
+    val acceptResult: (String?) -> Boolean = acceptResult@{ raw ->
+        val value = raw?.trim()?.takeIf { it.isNotBlank() } ?: return@acceptResult false
+        if (!currentValidator.value(value) || !scanConsumed.compareAndSet(false, true)) {
+            return@acceptResult false
+        }
+        try {
             currentOnQrCodeScanned.value(value)
+            diagnostics?.logResultAccepted()
+            true
+        } catch (error: Exception) {
+            scanConsumed.set(false)
+            diagnostics?.logResultDeliveryFailed(error)
+            false
         }
     }
 
@@ -233,12 +244,9 @@ private fun QrCodeScanner(
             diagnostics = diagnostics,
             onCandidates = { candidates, _, _ ->
                 val value = candidates.firstOrNull(currentValidator.value)
-                value?.let { accepted ->
-                    // onCandidates 由相机分析线程回调；acceptResult 会写入
-                    // NavController/SavedStateHandle，必须回到主线程执行。
-                    scope.launch { acceptResult(accepted) }
-                }
-                value != null
+                // The camera session dispatches validation and acceptance together
+                // on the main thread, after releasing the frame and checking liveness.
+                value != null && acceptResult(value)
             },
             onRestartRequested = { reason ->
                 if (!scanConsumed.get() && pendingRestartReason == null) {
@@ -262,7 +270,7 @@ private fun QrCodeScanner(
                     decoder = galleryDecoder,
                     diagnostics = diagnostics,
                     resultValidator = currentValidator.value,
-                    onResult = acceptResult,
+                    onResult = { acceptResult(it) },
                     onInvalid = {
                         Toast.makeText(
                             context,
@@ -567,15 +575,18 @@ private suspend fun processImageWithZxing(
         return
     }
 
-    val decoded = try {
-        withContext(Dispatchers.IO) { decoder.decodeBitmap(bitmap) }
-    } catch (error: Throwable) {
+    val candidates = try {
+        withContext(Dispatchers.Default) { decoder.decodeBitmap(bitmap) }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
         diagnostics?.logGalleryScanFailed(error)
         onNotFound()
         return
+    } finally {
+        bitmap.recycle()
     }
 
-    val candidates = listOfNotNull(decoded)
     when (val value = candidates.firstOrNull(resultValidator)) {
         null -> {
             if (candidates.isEmpty()) {
