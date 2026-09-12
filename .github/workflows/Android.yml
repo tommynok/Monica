@@ -132,33 +132,6 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Upload APKs to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          output_dir="app/build/outputs/apk/release"
-
-          mapfile -d '' release_files < <(
-            find "$output_dir" -maxdepth 1 -type f \
-              \( -iname '*.apk' -o -name 'checksums.txt' \) \
-              -print0
-          )
-          if [ "${#release_files[@]}" -eq 0 ]; then
-            echo "::error title=Release assets missing::No APK or checksum files were generated."
-            exit 1
-          fi
-
-          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" \
-              --verify-tag \
-              --title "$GITHUB_REF_NAME" \
-              --generate-notes
-          fi
-          gh release upload "$GITHUB_REF_NAME" "${release_files[@]}" --clobber
-
       - name: Notify documentation repository about release
         if: startsWith(github.ref, 'refs/tags/')
         continue-on-error: true
