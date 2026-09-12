@@ -28,6 +28,7 @@ private class OverviewSearchResult(val rows: List<OverviewPickerEntry>) {
 }
 
 /** Owns one reusable Rust index for the active search; no work runs in animation callbacks. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun VaultOverviewSearchResults(
     items: List<VaultV2Item>,
@@ -71,7 +72,10 @@ internal fun VaultOverviewSearchResults(
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize().imePadding().testTag("overview_search_results"),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 116.dp),
+        contentPadding = PaddingValues(
+            start = 20.dp, end = 20.dp, top = 6.dp,
+            bottom = if (WindowInsets.isImeVisible) 16.dp else 116.dp,
+        ),
         verticalArrangement = Arrangement.spacedBy(GroupedItemDefaults.Spacing),
     ) {
         when {

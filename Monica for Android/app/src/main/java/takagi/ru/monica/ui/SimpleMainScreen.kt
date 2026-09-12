@@ -2403,6 +2403,8 @@ fun SimpleMainScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
+                    // Child IME padding must exclude the navigation space already applied here.
+                    .consumeWindowInsets(paddingValues)
             ) {
             AuthenticatorPasskeyAnimatedContent(currentTab = currentTab) { displayedTab ->
             when (displayedTab) {
