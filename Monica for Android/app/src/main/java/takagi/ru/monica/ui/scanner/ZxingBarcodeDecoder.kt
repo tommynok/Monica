@@ -21,9 +21,11 @@ import java.nio.ByteBuffer
  * 避免为内置条码模型在每个 ABI 上多打包约 3MB 的原生库。
  * 相机帧（YUV_420_888）与相册位图共用同一读取器配置，码制集合由调用方给定。
  *
- * ML Kit 有两项隐性识别能力在替换时容易丢失，这里显式补齐：
+ * ML Kit 有三项隐性能力在替换时容易丢失，这里显式补齐：
  * 1. 反色二维码（暗底亮码，如深色主题下的登录码）——旧 zxing 方案的"正反混合扫描"覆盖的正是这个场景；
- * 2. 远距离小码——在抽稀解码面之外保留全分辨率兜底。
+ * 2. 远距离小码——在抽稀解码面之外保留全分辨率兜底；
+ * 3. 空闲帧的处理成本——复用亮度缓冲，每三帧才执行一次全分辨率深扫，
+ *    降低 GC 压力，避免长时间空扫时触发会话的帧停滞恢复。
  */
 internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat>) {
 
@@ -72,12 +74,12 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
             rotationQuarterTurns
         )
         val candidates = decodeWithFallback(decimatedSource)
-        frameNumber = (frameNumber + 1) % FULL_RESOLUTION_INTERVAL
+        frameNumber = (frameNumber + 1) % SWEEP_INTERVAL
         // Periodically inspect full resolution even after a hit: an unrelated large
         // code must not permanently hide a smaller code accepted by the caller.
-        if (candidates.isNotEmpty() && frameNumber != 0) return candidates
+        if (frameNumber != 0) return candidates
 
-        // 第二级：第一级落空时才构建的全分辨率亮度面，覆盖画面中占比很小的码。
+        // 第二级：按作者的分帧方案深扫，空帧也不例外，避免每帧跑满解码阶梯。
         fullLuminance = copyLuminance(
             buffer, origin, width, height, plane.rowStride, plane.pixelStride, 1, fullLuminance
         )
@@ -85,7 +87,7 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
             PlanarYUVLuminanceSource(fullLuminance, width, height, 0, 0, width, height, false),
             rotationQuarterTurns
         )
-        return (candidates + decodeWithFallback(fullSource)).distinct()
+        return (candidates + decodeFullResolution(fullSource)).distinct()
     }
 
     /**
@@ -162,6 +164,11 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
         return candidates.toList()
     }
 
+    /** Full-resolution sweeps only need Hybrid; the decimated path retains GlobalHistogram. */
+    private fun decodeFullResolution(source: LuminanceSource): List<String> =
+        (decode(BinaryBitmap(HybridBinarizer(source))) +
+            decode(BinaryBitmap(HybridBinarizer(source.invert())))).distinct()
+
     private fun rotated(source: LuminanceSource, quarterTurns: Int): LuminanceSource {
         var result = source
         repeat(quarterTurns) { result = rotateSourceCounterClockwise(result) }
@@ -214,6 +221,7 @@ internal class ZxingBarcodeDecoder(private val formats: Collection<BarcodeFormat
     private companion object {
         private const val ROTATION_ATTEMPTS = 4
         private const val DECIMATION = 2
-        private const val FULL_RESOLUTION_INTERVAL = 3
+        // The first two frames after startup stay light while the camera warms up.
+        private const val SWEEP_INTERVAL = 3
     }
 }
