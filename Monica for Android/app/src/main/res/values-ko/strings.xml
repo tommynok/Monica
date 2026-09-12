@@ -3533,6 +3533,10 @@
     <string name="import_type_stratum_title">Stratum 인증</string>
     <string name="import_type_stratum_desc">Stratum/AuthPro 백업 가져오기(.stratum/.txt/.html)</string>
     <string name="import_type_stratum_file_hint">.stratum / .txt / 선택 .html 파일</string>
+    <string name="import_csv_no_data_found">데이터를 가져오지 못했습니다. 파일 형식을 확인하세요.</string>
+    <string name="import_csv_file_unreadable">파일을 읽지 못했습니다. 파일이 아직 있는지 확인하세요.</string>
+    <string name="import_csv_file_empty">파일이 비어 있습니다.</string>
+    <string name="import_csv_invalid_format">잘못된 파일 형식</string>
     <string name="import_type_steam_title">Steam Guard</string>
     <string name="import_type_steam_desc">maFile에서 Steam 토큰 가져오기</string>
     <string name="import_type_steam_file_hint">.maFile 파일 선택</string>

@@ -2947,6 +2947,10 @@
     <string name="import_type_stratum_title">Stratum Auth</string>
     <string name="import_type_stratum_desc">Импорт Stratum/AuthPro (.stratum/.txt/.html)</string>
     <string name="import_type_stratum_file_hint">Выберите .stratum / .txt / .html</string>
+    <string name="import_csv_file_unreadable">Не удалось прочитать файл. Убедитесь, что он существует.</string>
+    <string name="import_csv_file_empty">Файл пуст.</string>
+    <string name="import_csv_invalid_format">Неверный формат файла</string>
+    <string name="import_csv_no_data_found">Не удалось импортировать данные. Проверьте формат файла.</string>
     <string name="import_type_steam_title">Steam Guard</string>
     <string name="import_type_steam_desc">Импорт токена Steam из maFile</string>
     <string name="import_type_steam_file_hint">Выберите .maFile</string>
