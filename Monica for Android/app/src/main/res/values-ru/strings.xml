@@ -2171,7 +2171,7 @@
     <string name="delete_password">Удалить пароль</string>
     <string name="delete_password_confirmation">Удалить этот пароль? Действие необратимо.</string>
     <string name="password_detail_storage_info">Хранилище</string>
-    <string name="password_detail_time_info">Временные данные</string>
+    <string name="password_detail_time_info">Даты</string>
     <string name="password_detail_last_modified">Последнее изменение</string>
 
     <!-- Common Account / Quick Fill -->
