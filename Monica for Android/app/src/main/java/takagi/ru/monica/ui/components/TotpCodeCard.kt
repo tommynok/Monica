@@ -540,7 +540,7 @@ fun TotpCodeCard(
                 }
             ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(10.dp)
             ) {
             // 标题和菜单
             Row(
@@ -799,8 +799,8 @@ fun TotpCodeCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            
+            Spacer(modifier = Modifier.height(8.dp))
+
             // 验证码显示
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -903,8 +903,8 @@ fun TotpCodeCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
-            
+            Spacer(modifier = Modifier.height(4.dp))
+
             // 进度条/计数器显示
             // 判断是否需要隐藏进度条（启用统一进度条模式且是标准周期30s/60s）
             val isStandardPeriod = totpData.period == 30 || totpData.period == 60
