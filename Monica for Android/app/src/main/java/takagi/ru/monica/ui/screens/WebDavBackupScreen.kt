@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -581,7 +582,10 @@ fun WebDavBackupScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
-                                Text(stringResource(R.string.webdav_test_connection))
+                                Text(
+                                    text = stringResource(R.string.webdav_test_connection),
+                                    textAlign = TextAlign.Center
+                                )
                             }
                         } else {
                             // 已配置状态显示重新配置和清除配置按钮
