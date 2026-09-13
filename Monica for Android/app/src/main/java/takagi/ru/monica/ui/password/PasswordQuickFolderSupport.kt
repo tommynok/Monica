@@ -603,7 +603,7 @@ internal fun buildQuickFolderBreadcrumbs(
 
         else -> {
             val rootTitle = if (quickFolderRootFilter is CategoryFilter.All) {
-                "ALL"
+                context.getString(R.string.nav_passwords)
             } else {
                 context.getString(R.string.password_list_quick_folder_root_label)
             }

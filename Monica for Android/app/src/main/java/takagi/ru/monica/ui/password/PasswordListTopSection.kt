@@ -183,7 +183,7 @@ internal fun PasswordListTopSection(
     }
     Column {
         val title = when (val filter = currentFilter) {
-            is CategoryFilter.All -> "ALL"
+            is CategoryFilter.All -> stringResource(R.string.nav_passwords)
             is CategoryFilter.Archived -> stringResource(R.string.archive_page_title)
             is CategoryFilter.Local -> stringResource(R.string.filter_monica)
             is CategoryFilter.LocalOnly -> stringResource(R.string.filter_local_only)
