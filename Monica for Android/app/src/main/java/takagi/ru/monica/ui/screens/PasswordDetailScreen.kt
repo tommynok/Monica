@@ -3260,7 +3260,7 @@ internal fun PasswordItemRow(
         PasswordStrengthAnalyzer.StrengthLevel.VERY_STRONG -> MaterialTheme.colorScheme.primary
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -3335,7 +3335,7 @@ internal fun PasswordItemRow(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(4.dp))
                 .clickable(enabled = hasPasswordValue && !isUnavailable) { actionMenuState.open() }
-                .padding(vertical = 2.dp),
+                .padding(vertical = 4.dp),
             text = when {
                 isUnavailable -> unavailableMessage
                 !hasPasswordValue -> stringResource(R.string.permission_status_unavailable)
