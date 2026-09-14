@@ -3348,8 +3348,7 @@ private fun PasswordItemRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(4.dp))
-                .clickable(enabled = hasPasswordValue && !isUnavailable) { actionMenuState.open() }
-                .padding(vertical = 4.dp),
+                .clickable(enabled = hasPasswordValue && !isUnavailable) { actionMenuState.open() },
             text = when {
                 isUnavailable -> unavailableMessage
                 !hasPasswordValue -> stringResource(R.string.permission_status_unavailable)
