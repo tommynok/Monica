@@ -3178,8 +3178,8 @@ private fun PasswordListCard(
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = stringResource(R.string.password),
@@ -3334,8 +3334,7 @@ internal fun PasswordItemRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(4.dp))
-                .clickable(enabled = hasPasswordValue && !isUnavailable) { actionMenuState.open() }
-                .padding(vertical = 6.dp),
+                .clickable(enabled = hasPasswordValue && !isUnavailable) { actionMenuState.open() },
             text = when {
                 isUnavailable -> unavailableMessage
                 !hasPasswordValue -> stringResource(R.string.permission_status_unavailable)
