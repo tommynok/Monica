@@ -2483,8 +2483,8 @@
     <string name="time_days_ago">%1$d дн. назад</string>
 
     <!-- Timeline/trash hardcoded text cleanup -->
-    <string name="timeline_title">Хронология</string>
-    <string name="timeline_and_trash_title">Хронология / Корзина</string>
+    <string name="timeline_title">История</string>
+    <string name="timeline_and_trash_title">История / Корзина</string>
     <string name="sync_bitwarden_database_menu">Синхронизировать Bitwarden</string>
     <string name="cache_bitwarden_database_menu">Кешировать Bitwarden</string>
     <string name="clear_bitwarden_cache_menu">Очистить кеш Bitwarden</string>
@@ -3759,7 +3759,7 @@
     <string name="card_face_brand_hidden_description">Скрыт, когда вся информация о карте скрыта.</string>
     <string name="card_face_choose_image">Выбрать изображение</string>
     <string name="card_face_crop_hint">Кадрирование по центру в стандартных пропорциях банковской карты</string>
-    <string name="card_face_customize">Оформление карты</string>
+    <string name="card_face_customize">Дизайн карточки</string>
     <string name="card_face_customize_description">Используйте своё изображение и выберите, какая информация о карте отображается.</string>
     <string name="card_face_display_all">Показывать всю информацию о карте</string>
     <string name="card_face_display_all_description">Показывает название, основную информацию, имя и другие доступные детали.</string>
