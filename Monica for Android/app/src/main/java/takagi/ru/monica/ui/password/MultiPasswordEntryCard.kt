@@ -79,8 +79,8 @@ fun MultiPasswordEntryCard(
                     onClick = { onCardClick?.invoke() },
                     onLongClick = onLongClick
                 )
-                .padding(if (isInExpandedGroup) 16.dp else 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(if (isInExpandedGroup) 12.dp else 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -210,14 +210,14 @@ fun MultiPasswordEntryCard(
 
                     if (onToggleGroupCover != null && passwords.any { it.isGroupCover }) {
                         Box(
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier.size(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             if (!isSelectionMode) {
                                 passwords.firstOrNull { it.isGroupCover }?.let { coverEntry ->
                                     IconButton(
                                         onClick = { onToggleGroupCover(coverEntry) },
-                                        modifier = Modifier.size(36.dp),
+                                        modifier = Modifier.size(32.dp),
                                         enabled = canSetGroupCover
                                     ) {
                                         Icon(
@@ -241,7 +241,7 @@ fun MultiPasswordEntryCard(
 
                     if (onToggleFavorite != null) {
                         Box(
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier.size(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             val allFavorited = passwords.all { it.isFavorite }
@@ -253,7 +253,7 @@ fun MultiPasswordEntryCard(
                                             onToggleFavorite(entry)
                                         }
                                     },
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(32.dp)
                                 ) {
                                     Icon(
                                         if (anyFavorited) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
