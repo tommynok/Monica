@@ -3461,7 +3461,7 @@
     <string name="qs_next">Далее</string>
     <string name="qs_skip">Пропустить</string>
     <string name="qs_previous">Назад</string>
-    <string name="qs_welcome_heading">Monica по-вашему</string>
+    <string name="qs_welcome_heading">Настройте под себя</string>
     <string name="qs_welcome_description">Выберите раскладку, настройте защиту и добавьте данные. Этот мастер можно снова открыть в настройках.</string>
     <string name="qs_language_selection">Язык</string>
     <string name="qs_collapse">Свернуть</string>
