@@ -56,6 +56,13 @@ Russian and non-technical; this file is my own working memory, in English.
   of `autofill_protection_strings.xml`. Quality checked: natural, terminology
   consistent internally — nothing else in the app used those terms, so no
   cross-file drift to worry about.
+- **Bitwarden Settings screen hardcode** (was flagged as unresolved earlier in
+  the session, and posted about in the author's Telegram — that post is now
+  stale). Re-checked on 2026-09-19: the whole screen has since been migrated
+  to `stringResource(R.string.legacy_ui_*)`, fully translated into RU (and
+  presumably the same other locales as the rest of `legacy_ui_strings.xml`).
+  Only remaining Chinese in the file is `//`-comments, not user-visible text.
+  **This is fully fixed upstream — nothing to do here anymore.**
 
 ### Live, current, waiting on the user to open PRs
 All merged into `test/combined-all-fixes`, rebased onto `upstream/main` @ 6e10340d:
@@ -75,12 +82,18 @@ All merged into `test/combined-all-fixes`, rebased onto `upstream/main` @ 6e1034
   `LocalKeePassWebDavBrowser.kt` — see note above about WebDavBackupScreen.kt).
 - `ci/cache-rust-and-gradle-restore-keys` — cache Rust toolchain/registry +
   `rust-jni/target`, restore-keys for the Gradle cache, in both workflow files.
+- `fix/ru-all-passwords-title` — `legacy_ui_all_title`: "ВСЁ" → "Все пароли"
+  (only used on the passwords screen, single usage site, so specific wording
+  is safe). **Known issue: user tested it, title truncates to just "Все" on
+  their device — doesn't fit. Deprioritized, not reverted, left in the
+  combined branch as-is for now.**
+- `fix/ru-quick-setup-heading` — `qs_welcome_heading`: "Monica по-вашему" →
+  "Настройте под себя" (calque of "Make Monica your own"; new wording drops
+  the repeated brand name since the big "Monica" title sits right above it).
 
 ### Not merged, waiting on the user's/author's decision — not ours to fix
-- Bitwarden Settings screen — ~50 lines of hardcoded Chinese
-  (`BitwardenSettingsScreen.kt`), a whole screen, untouched. User posted about
-  it in the author's Telegram group (topic "问题反馈"/Issue Feedback), waiting
-  for a reply. **Do not start fixing this on our own without explicit go-ahead.**
+(none currently — the last item here, Bitwarden Settings hardcode, turned out
+to be already fixed upstream; see "Dead" section above.)
 
 ## Screenshot findings already resolved
 
