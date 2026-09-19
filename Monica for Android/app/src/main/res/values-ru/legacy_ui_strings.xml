@@ -252,7 +252,7 @@
     <string name="legacy_ui_fingerprint_brightness_tip">Если при ярком освещении отпечаток не распознаётся, измените яркость экрана</string>
     <string name="legacy_ui_fingerprint_sensor_tip">В устройстве есть сканер отпечатков</string>
     <string name="legacy_ui_fingerprint_clean_sensor_tip">Держите сканер отпечатков чистым</string>
-    <string name="legacy_ui_all_title">ВСЁ</string>
+    <string name="legacy_ui_all_title">Все пароли</string>
     <string name="legacy_ui_oplog_sync_bundle_title">Журнал операций / Пакет синхронизации</string>
     <string name="legacy_ui_autofill_failed">Ошибка автозаполнения</string>
     <string name="legacy_ui_autofill_save_failed">Ошибка сохранения</string>
